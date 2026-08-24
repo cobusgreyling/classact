@@ -504,15 +504,9 @@ function defaultBuild() {
 }
 
 function startNewAgent() {
-  state.build = {
-    class_name: "MyAgent",
-    role: "You are a focused specialist agent.",
-    fields: [],
-    methods: [
-      meth("run", "Do the task faithfully and concisely.", [{ name: "text", type: "str" }], "str", "agentic", "Predict"),
-    ],
-  };
-  state.selectedNode = state.build.methods[0].id;
+  const blank = TEMPLATES.find((t) => t.id === "blank");
+  state.build = blank.spec();
+  state.selectedNode = null;
   showTab("build");
 }
 
