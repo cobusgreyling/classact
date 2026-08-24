@@ -8,16 +8,16 @@
 
 Inspect a Python class. Run a method. Watch the call tree. Build a new agent.
 
-**Docs:** in the studio at [`/docs`](http://127.0.0.1:7877/docs) · markdown: [`docs/GUIDE.md`](docs/GUIDE.md)
+**Docs:** studio **Docs** link → [`/docs`](http://127.0.0.1:7877/docs) · markdown [`docs/GUIDE.md`](docs/GUIDE.md)
 
 The model is **open**: [Nemotron 3.5 Lightning](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b) on hosted **NVIDIA NIM**. No local GPU is required.
 
 | | |
 |--|--|
-| **Inspect** | Class, role docstring, fields, methods (`…` vs ordinary Python) |
-| **Run** | Type a message, pick agent/method, run on Lightning NIM — result stays on the same screen |
+| **Inspect** | UML class card · **+ New agent** (blank Build) · Open in Build |
+| **Run** | Prompt console — type a message, reply stays on the tab |
 | **Watch** | Live span tree — methods, generations, LLM calls, CodeAct cells |
-| **Build** | Live class graph: drag methods, toggle Predict / CodeAct / Python tools, generate a class |
+| **Build** | Class is a label; selected method is high-contrast; generate `workspace/` |
 
 ```text
 Browser  (black / green / white)
@@ -65,7 +65,9 @@ NIM_MODEL_ID=nvidia/nemotron-3.5-lightning-30b-a3b
 | `ClassifierAgent` | Predict | Structured Pydantic output, no generated code |
 | `SupportAgent` | CodeAct + Python tools | `get_order` / `is_refund_eligible` as live methods, `triage(...)` is `…` |
 
-Build is a graphic object editor: the class sits in the center, methods orbit as nodes you can click and drag. Templates (Headline, Classifier, Support, Blank) seed the graph. Generate writes `workspace/` and the new class shows up under Inspect. From Inspect, **Open in Build** loads an existing agent onto the canvas.
+**+ New agent** (Inspect rail) opens Build on a blank `MyAgent`. The class in the center is a label — name and role sit above the graph. Click a method node to select it (high-contrast); `+` adds a capability. **Generate class** writes `workspace/` and the agent appears in Inspect. **Open in Build** loads the agent you were inspecting, not a blank.
+
+Full walkthrough: [`docs/GUIDE.md`](docs/GUIDE.md).
 
 ## Safety
 
