@@ -19,6 +19,7 @@ function showTab(name) {
   $$(".tab").forEach((t) => t.classList.toggle("on", t.dataset.tab === name));
   $$(".pane").forEach((p) => p.classList.toggle("on", p.id === `tab-${name}`));
   if (name === "build") requestAnimationFrame(() => renderBuild({ relayout: true }));
+  if (name === "run") requestAnimationFrame(() => $("#runPrompt")?.focus());
 }
 
 $$(".tab").forEach((btn) => {
@@ -112,7 +113,7 @@ function umlCard(a) {
   ).join("") || `<div class="uml-row muted">no public fields</div>`;
   const methods = a.methods.map((m) => {
     const mark = m.kind === "agentic" ? `<span class="ell">…</span>` : `<span class="muted">def</span>`;
-    return `<div class="uml-row"><span>${mark} ${esc(m.name)}</span><span class="muted">${esc(m.strategy || "python")}</span></div>`;
+    return `<div class="uml-row hit" data-run-method="${esc(m.name)}"><span>${mark} ${esc(m.name)}</span><span class="muted">${esc(m.strategy || "python")} · run</span></div>`;
   }).join("");
   const orbs = a.methods.map((m) => {
     const cls = m.kind === "python" ? "chip" : "chip";
@@ -137,6 +138,35 @@ $("#forkBtn").addEventListener("click", () => {
   showTab("build");
 });
 
+$("#inspectDiagram").addEventListener("click", (e) => {
+  const row = e.target.closest("[data-run-method]");
+  if (!row) return;
+  fillRunSelectors(state.selectedId, row.dataset.runMethod);
+  showTab("run");
+});
+
+const TEXT_ARG = /^(text|message|prompt|query|input|question|content|body)$/i;
+
+const RUN_SAMPLES = {
+  ClassifierAgent: [
+    { text: "Great product, but shipping was slow." },
+    { text: "Broken feature, needs immediate fix!" },
+    { text: "The headphones sound incredible and arrived a day early." },
+  ],
+  SupportAgent: [
+    { text: "I want a refund for the studio headphones.", extras: { order_id: "ORD-1001" } },
+    { text: "Package never arrived. Where is my DGX Spark?", extras: { order_id: "ORD-2044" } },
+    { text: "The cable is fine but I changed my mind — can I send it back?", extras: { order_id: "ORD-3302" } },
+  ],
+  HeadlineAgent: [
+    { text: "Nemotron 3.5 Lightning is now a NIM for always-on agents." },
+    { text: "ClassAct lets you inspect, run, watch, and build object-oriented agents." },
+  ],
+  FeedbackAgent: [
+    { text: "Love the build quality. Support took three days to reply." },
+  ],
+};
+
 function fillRunSelectors(agentId, methodName) {
   const agentSel = $("#runAgent");
   const methodSel = $("#runMethod");
@@ -152,50 +182,98 @@ function fillRunSelectors(agentId, methodName) {
     `<option value="${esc(m.name)}">${esc(m.name)} · ${m.kind === "agentic" ? (m.strategy || "agentic") : "python"}</option>`
   ).join("");
   if (methodName) methodSel.value = methodName;
+  else {
+    const agentic = methods.find((m) => m.kind === "agentic");
+    if (agentic) methodSel.value = agentic.name;
+  }
   modelSel.innerHTML = (state.models.length ? state.models : [{ id: "", label: "default" }])
     .map((m) => `<option value="${esc(m.id)}">${esc(m.label || m.id)}</option>`)
     .join("");
   renderRunArgs();
 }
 
+function currentAgent() {
+  return agentById($("#runAgent").value);
+}
+
 function currentMethod() {
-  const agent = agentById($("#runAgent").value);
+  const agent = currentAgent();
   if (!agent) return null;
   return agent.methods.find((m) => m.name === $("#runMethod").value) || null;
 }
 
-function renderRunArgs() {
-  const m = currentMethod();
-  const box = $("#runArgs");
-  box.innerHTML = "";
-  $("#runHint").textContent = m ? (m.doc || m.signature) : "Choose an agent and method.";
-  if (!m) return;
-  for (const arg of m.args) {
-    const lab = document.createElement("label");
-    const isLong = arg.type === "str" && arg.name.match(/text|message|prompt|input/i);
-    const control = isLong
-      ? `<textarea id="arg-${arg.name}" rows="4" placeholder="${esc(arg.type)}"></textarea>`
-      : `<input id="arg-${arg.name}" type="text" placeholder="${esc(arg.type)}${arg.default ? " = " + esc(arg.default) : ""}" />`;
-    lab.innerHTML = `${esc(arg.name)} <span class="muted">(${esc(arg.type)})</span>${control}`;
-    box.appendChild(lab);
-    if (arg.default) {
-      const el = lab.querySelector("input, textarea");
-      const raw = String(arg.default).replace(/^['"]|['"]$/g, "");
-      if (arg.name === "order_id") el.value = "ORD-1001";
-      else if (!isLong) el.value = raw;
-    }
-  }
+function primaryTextArg(m) {
+  if (!m || !m.args) return null;
+  const strings = m.args.filter((a) => a.type === "str" || !a.type);
+  return strings.find((a) => TEXT_ARG.test(a.name)) || strings[0] || null;
 }
 
-$("#runAgent").addEventListener("change", renderRunArgs);
-$("#runMethod").addEventListener("change", renderRunArgs);
-
-$("#runBtn").addEventListener("click", async () => {
+function renderRunArgs() {
+  const agent = currentAgent();
   const m = currentMethod();
-  const agentId = $("#runAgent").value;
-  if (!m || !agentId) return;
-  const args = {};
+  const box = $("#runArgs");
+  const prompt = $("#runPrompt");
+  box.innerHTML = "";
+  $("#runHint").textContent = m
+    ? `${agent ? agent.class_name + "." : ""}${m.name} — ${m.doc || m.signature}`
+    : "Choose an agent and method, then type a message.";
+  if (!m) return;
+  const primary = primaryTextArg(m);
+  $("#promptLabel").textContent = primary ? primary.name : "input";
+  prompt.placeholder = primary
+    ? `Type ${primary.name} for ${m.name}…`
+    : "This method has no text argument — fill the fields below.";
+  prompt.disabled = !primary;
   for (const arg of m.args) {
+    if (primary && arg.name === primary.name) continue;
+    const lab = document.createElement("label");
+    const raw = arg.default ? String(arg.default).replace(/^['"]|['"]$/g, "") : "";
+    const fallback = arg.name === "order_id" ? "ORD-1001" : raw;
+    lab.innerHTML = `${esc(arg.name)} <span class="muted">(${esc(arg.type)})</span>
+      <input id="arg-${arg.name}" type="text" value="${esc(fallback)}" placeholder="${esc(arg.type)}" />`;
+    box.appendChild(lab);
+  }
+  updatePromptCount();
+  renderSamples(agent, m, primary);
+}
+
+function renderSamples(agent, method, primary) {
+  const box = $("#runSamples");
+  const key = agent ? agent.class_name : "";
+  const list = RUN_SAMPLES[key] || [
+    { text: "Summarize this in one sentence: always-on agents should execute on Lightning." },
+    { text: "The unit works, but setup took too long." },
+  ];
+  box.innerHTML = list.map((s, i) =>
+    `<button type="button" class="sample" data-i="${i}">${esc(s.text)}</button>`
+  ).join("");
+  box.querySelectorAll(".sample").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const s = list[Number(btn.dataset.i)];
+      if (primary) $("#runPrompt").value = s.text;
+      if (s.extras) {
+        for (const [k, v] of Object.entries(s.extras)) {
+          const el = document.getElementById(`arg-${k}`);
+          if (el) el.value = v;
+        }
+      }
+      updatePromptCount();
+      $("#runPrompt").focus();
+    });
+  });
+}
+
+function updatePromptCount() {
+  const n = ($("#runPrompt").value || "").length;
+  $("#promptCount").textContent = `${n} chars`;
+}
+
+function collectRunArgs(m) {
+  const args = {};
+  const primary = primaryTextArg(m);
+  if (primary) args[primary.name] = $("#runPrompt").value;
+  for (const arg of m.args) {
+    if (primary && arg.name === primary.name) continue;
     const el = document.getElementById(`arg-${arg.name}`);
     if (!el) continue;
     let val = el.value;
@@ -204,10 +282,58 @@ $("#runBtn").addEventListener("click", async () => {
     if (arg.type === "bool") val = ["1", "true", "yes", "on"].includes(String(val).toLowerCase());
     args[arg.name] = val;
   }
+  return args;
+}
+
+function renderReply(ok, value, error) {
+  const box = $("#runResult");
+  const raw = $("#runOut");
+  if (!ok) {
+    box.className = "reply err";
+    box.textContent = error || "Run failed.";
+    raw.classList.remove("hidden");
+    raw.textContent = error || "";
+    return;
+  }
+  box.className = "reply";
+  if (value && typeof value === "object") {
+    const lead = value.summary || value.note || "";
+    const rows = Object.entries(value)
+      .filter(([k]) => k !== "summary" && k !== "note")
+      .map(([k, v]) => `<div class="kv"><b>${esc(k)}</b><span>${esc(Array.isArray(v) ? v.join(", ") : v)}</span></div>`)
+      .join("");
+    box.innerHTML = `${lead ? `<div class="lead">${esc(lead)}</div>` : ""}${rows || ""}`;
+    raw.classList.remove("hidden");
+    raw.textContent = JSON.stringify(value, null, 2);
+  } else {
+    box.innerHTML = `<div class="lead">${esc(String(value ?? ""))}</div>`;
+    raw.classList.add("hidden");
+    raw.textContent = String(value ?? "");
+  }
+}
+
+$("#runAgent").addEventListener("change", () => {
+  fillRunSelectors($("#runAgent").value);
+});
+$("#runMethod").addEventListener("change", renderRunArgs);
+$("#runPrompt").addEventListener("input", updatePromptCount);
+$("#runPrompt").addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    e.preventDefault();
+    $("#runBtn").click();
+  }
+});
+
+$("#runBtn").addEventListener("click", async () => {
+  const m = currentMethod();
+  const agentId = $("#runAgent").value;
+  if (!m || !agentId) return;
+  const args = collectRunArgs(m);
   $("#runBtn").disabled = true;
-  $("#runStatus").textContent = "running…";
-  $("#runOut").textContent = "…";
-  showTab("watch");
+  $("#runStatus").textContent = "running on NIM…";
+  $("#runResult").className = "reply wait";
+  $("#runResult").textContent = "Calling the agent…";
+  $("#runLive").innerHTML = `<div class="muted">waiting for spans…</div>`;
   $("#watchTree").innerHTML = `<div class="muted">waiting for spans…</div>`;
   try {
     const started = await jpost("/api/runs", {
@@ -221,8 +347,7 @@ $("#runBtn").addEventListener("click", async () => {
     watchRun(started.run_id);
   } catch (err) {
     $("#runStatus").textContent = "error";
-    $("#runOut").textContent = String(err.message || err);
-    $("#watchTree").innerHTML = `<div class="error">${esc(String(err.message || err))}</div>`;
+    renderReply(false, null, String(err.message || err));
     $("#runBtn").disabled = false;
   }
 });
@@ -252,23 +377,22 @@ async function finishRun(runId) {
   try {
     const run = await jget(`/api/runs/${encodeURIComponent(runId)}`);
     renderTree(run.spans || []);
-    $("#runStatus").textContent = run.status;
-    if (run.status === "ok") {
-      $("#runOut").textContent = JSON.stringify(run.result, null, 2);
-    } else {
-      $("#runOut").textContent = run.error || run.status;
-    }
+    $("#runStatus").textContent = run.status === "ok" ? "done" : run.status;
+    if (run.status === "ok") renderReply(true, run.result);
+    else renderReply(false, null, run.error || run.status);
   } catch (err) {
-    $("#runOut").textContent = String(err.message || err);
+    renderReply(false, null, String(err.message || err));
   } finally {
     $("#runBtn").disabled = false;
   }
 }
 
 function renderTree(spans) {
-  const box = $("#watchTree");
-  if (!spans.length) {
-    box.innerHTML = `<div class="muted">no spans yet</div>`;
+  const html = !spans.length ? `<div class="muted">no spans yet</div>` : null;
+  if (html) {
+    $("#watchTree").innerHTML = html;
+    const live = $("#runLive");
+    if (live) live.innerHTML = html;
     return;
   }
   const byId = {};
@@ -279,7 +403,10 @@ function renderTree(spans) {
     if (s.parent_id && byId[s.parent_id]) byId[s.parent_id].children.push(node);
     else roots.push(node);
   }
-  box.innerHTML = roots.map((n) => renderNode(n, 0)).join("");
+  const painted = roots.map((n) => renderNode(n, 0)).join("");
+  $("#watchTree").innerHTML = painted;
+  const live = $("#runLive");
+  if (live) live.innerHTML = painted;
 }
 
 function renderNode(node, depth) {

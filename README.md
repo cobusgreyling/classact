@@ -13,7 +13,7 @@ The model is **open**: [Nemotron 3.5 Lightning](https://build.nvidia.com/nvidia/
 | | |
 |--|--|
 | **Inspect** | Class, role docstring, fields, methods (`…` vs ordinary Python) |
-| **Run** | Await a typed method against Lightning on NIM |
+| **Run** | Type a message, pick agent/method, run on Lightning NIM — result stays on the same screen |
 | **Watch** | Live span tree — methods, generations, LLM calls, CodeAct cells |
 | **Build** | Live class graph: drag methods, toggle Predict / CodeAct / Python tools, generate a class |
 

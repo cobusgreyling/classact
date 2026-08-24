@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ClassAct — NVIDIA Object-Oriented Agents</title>
-  <link rel="stylesheet" href="/static/styles.css?v=0.1.1" />
+  <link rel="stylesheet" href="/static/styles.css?v=0.1.2" />
 </head>
 <body>
   <div class="scan" aria-hidden="true"></div>
@@ -56,7 +56,7 @@
     </section>
 
     <section id="tab-run" class="pane">
-      <div class="formgrid">
+      <div class="run-picks">
         <label>Agent
           <select id="runAgent"></select>
         </label>
@@ -68,13 +68,34 @@
         </label>
       </div>
       <p class="hint" id="runHint"></p>
-      <div id="runArgs" class="args"></div>
-      <div class="row">
-        <button id="runBtn" class="btn" type="button">Run on NIM</button>
-        <span id="runStatus" class="muted"></span>
+      <div class="run-layout">
+        <div class="run-composer">
+          <div class="prompt-shell">
+            <div class="prompt-meta">
+              <span id="promptLabel">Message</span>
+              <span id="promptCount" class="muted">0</span>
+            </div>
+            <textarea id="runPrompt" rows="8" placeholder="Type what the agent should work on…"></textarea>
+            <div id="runArgs" class="run-extras"></div>
+            <div class="prompt-foot">
+              <button id="runBtn" class="btn" type="button">Run agent</button>
+              <span class="muted kbd-hint">⌘ ↵</span>
+              <span id="runStatus" class="muted"></span>
+            </div>
+          </div>
+          <div>
+            <h3>Try</h3>
+            <div id="runSamples" class="samples"></div>
+          </div>
+        </div>
+        <div class="run-out">
+          <h3>Reply</h3>
+          <div id="runResult" class="reply">Type a message and run the agent.</div>
+          <pre id="runOut" class="code hidden">—</pre>
+          <h3>Live trace</h3>
+          <div id="runLive" class="trace-board mini"><div class="muted">Spans appear here while the method runs.</div></div>
+        </div>
       </div>
-      <h3>Result</h3>
-      <pre id="runOut" class="code">—</pre>
     </section>
 
     <section id="tab-watch" class="pane">
@@ -116,6 +137,6 @@
   <footer>
     ClassAct · NVIDIA Object-Oriented Agents · Nemotron on NIM · Apache-2.0
   </footer>
-  <script src="/static/app.js?v=0.1.1"></script>
+  <script src="/static/app.js?v=0.1.2"></script>
 </body>
 </html>
