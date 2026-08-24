@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Docs — ClassAct</title>
+  <link rel="stylesheet" href="/static/styles.css?v=0.1.3" />
+</head>
+<body class="doc-body">
+  <div class="scan" aria-hidden="true"></div>
+  <header class="hero compact">
+    <img src="/static/header.jpg" alt="" class="banner" />
+  </header>
+  <div class="statusbar">
+    <span class="brand">CLASSACT</span>
+    <span class="sep">/</span>
+    <span>Docs</span>
+    <span class="grow"></span>
+    <a class="doc-link" href="/">Studio</a>
+    <a class="doc-link" href="https://github.com/cobusgreyling/classact" rel="noopener">GitHub</a>
+  </div>
+
+  <main class="doc-wrap">
+    <nav class="toc" aria-label="On this page">
+      <a href="#what">What it is</a>
+      <a href="#start">Quick start</a>
+      <a href="#inspect">Inspect</a>
+      <a href="#run">Run</a>
+      <a href="#watch">Watch</a>
+      <a href="#build">Build</a>
+      <a href="#keys">Keyboard</a>
+      <a href="#safety">Safety</a>
+      <a href="#http">HTTP</a>
+    </nav>
+
+    <article class="doc">
+      <p class="eyebrow">User guide</p>
+      <h1>ClassAct</h1>
+      <p class="lede">
+        A studio for <a href="https://github.com/NVIDIA-NeMo/labs-OO-Agents">NVIDIA Object-Oriented Agents</a>.
+        An agent is a Python class. Methods are capabilities. A method whose body is
+        <code>…</code> is filled in at runtime by an LLM.
+      </p>
+      <p>
+        Default model: open
+        <a href="https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b">Nemotron 3.5 Lightning</a>
+        on hosted NIM. No GPU on your desk.
+      </p>
+
+      <h2 id="what">Architecture</h2>
+      <pre class="code">Browser
+   │  HTTP + SSE
+   ▼
+ClassAct  FastAPI
+   ├─ Inspect   catalog/ + workspace/
+   ├─ Run       await a typed method
+   ├─ Watch     OpenTelemetry span tree
+   ├─ Build     class graph → Python file
+   ├─ NOOA      class = agent, … = LLM
+   └─ LiteLLM ── HTTPS ──► NIM  Lightning</pre>
+      <p>ClassAct does not fork NOOA. It reflects classes, runs them with your NIM key, and writes new modules into <code>workspace/</code>.</p>
+
+      <h2 id="start">Quick start</h2>
+      <pre class="code">cp .env.example .env   # NVIDIA_API_KEY from build.nvidia.com
+./run.sh
+# → http://127.0.0.1:7877</pre>
+      <p>Inspect and Build work without a key. Run and Watch need NIM.</p>
+      <pre class="code">NOOA_MODEL=nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b
+NIM_MODEL_ID=nvidia/nemotron-3.5-lightning-30b-a3b</pre>
+      <p>Never commit <code>.env</code>.</p>
+
+      <h2 id="inspect">Inspect</h2>
+      <p>The rail lists agents from <code>catalog/</code> (shipped) and <code>workspace/</code> (generated). The card is a UML view of the class:</p>
+      <ul>
+        <li><strong>Fields</strong> — public annotated state</li>
+        <li><strong>Methods</strong> — <code>…</code> is agentic (LLM); <code>def</code> is ordinary Python</li>
+        <li><strong>Source</strong> — the file on disk</li>
+      </ul>
+      <p>Click a method row to jump to Run. <strong>Open in Build</strong> loads the class onto the canvas.</p>
+
+      <h2 id="run">Run</h2>
+      <p>Run is a prompt console.</p>
+      <ol>
+        <li>Pick agent, method, and model. Agentic methods are selected by default.</li>
+        <li>Type into the large message box. That is the method’s main text argument (<code>text</code>, <code>message</code>, <code>prompt</code>, …).</li>
+        <li>Fill extra arguments (for example <code>order_id</code>) under the prompt.</li>
+        <li>Use a <strong>Try</strong> chip, or press <strong>⌘↵</strong> / <strong>Ctrl+Enter</strong>.</li>
+      </ol>
+      <p>The <strong>Reply</strong> stays on this tab. Structured objects render as cards; JSON sits underneath. Spans stream in Live trace — submitting does not navigate to Watch.</p>
+      <table>
+        <thead><tr><th>Agent</th><th>Method</th><th>What to type</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>ClassifierAgent</code></td>
+            <td><code>classify</code></td>
+            <td>A customer review. Returns a typed <code>FeedbackAnalysis</code>.</td>
+          </tr>
+          <tr>
+            <td><code>SupportAgent</code></td>
+            <td><code>triage</code></td>
+            <td>A support message plus <code>order_id</code> (<code>ORD-1001</code>, <code>ORD-2044</code>, <code>ORD-3302</code>).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="watch">Watch</h2>
+      <p>Each box is an OpenTelemetry span. Nesting follows the Python call tree, not only the LLM transcript:</p>
+      <ul>
+        <li><code>method.&lt;name&gt;</code> — agent method</li>
+        <li><code>generation</code> — Predict or CodeAct loop</li>
+        <li><code>litellm.acompletion</code> — NIM call</li>
+        <li><code>code_execution</code> — a CodeAct Python cell</li>
+      </ul>
+
+      <h2 id="build">Build</h2>
+      <p>A live object graph.</p>
+      <ul>
+        <li>The <strong>class</strong> is the center node. Click to edit name, role, and fields.</li>
+        <li><strong>Methods orbit</strong> it. Click to inspect; drag to rearrange. <code>+</code> adds a capability.</li>
+        <li>Kind: <strong>Agentic (…)</strong> vs <strong>Python tool</strong>.</li>
+        <li>Strategy: <strong>Predict</strong> (typed, no code exec) vs <strong>CodeAct</strong> (model writes Python).</li>
+        <li><strong>Live Python</strong> updates as you type. <strong>Generate class</strong> writes <code>workspace/</code>.</li>
+      </ul>
+      <p>Templates: Headline, Classifier, Support, Blank. Class names must be PascalCase.</p>
+
+      <h2 id="keys">Keyboard</h2>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><code>I</code></td><td>Inspect</td></tr>
+          <tr><td><code>R</code></td><td>Run (focuses the prompt)</td></tr>
+          <tr><td><code>W</code></td><td>Watch</td></tr>
+          <tr><td><code>B</code></td><td>Build</td></tr>
+          <tr><td><code>⌘↵</code></td><td>Submit Run</td></tr>
+        </tbody>
+      </table>
+      <p>Letter shortcuts are ignored while a text field is focused.</p>
+
+      <h2 id="safety">Safety</h2>
+      <p>NOOA can execute model-generated Python. New Build agents default to Predict. Shipped CodeAct tools are in-memory only. Framework checks are not a sandbox — use a container, a VM, or <a href="https://github.com/NVIDIA/OpenShell">NVIDIA OpenShell</a>.</p>
+
+      <h2 id="http">HTTP</h2>
+      <table>
+        <thead><tr><th>Path</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><code>/</code></td><td>Studio</td></tr>
+          <tr><td><code>/docs</code></td><td>This guide</td></tr>
+          <tr><td><code>/api/health</code></td><td>NIM ping</td></tr>
+          <tr><td><code>/api/agents</code></td><td>Inspect payload</td></tr>
+          <tr><td><code>POST /api/runs</code></td><td>Start a method</td></tr>
+          <tr><td><code>/api/runs/{id}/events</code></td><td>SSE spans</td></tr>
+          <tr><td><code>POST /api/build</code></td><td>Write an agent</td></tr>
+          <tr><td><code>/api/openapi</code></td><td>OpenAPI UI</td></tr>
+        </tbody>
+      </table>
+      <p>Apache-2.0. Markdown copy: <a href="https://github.com/cobusgreyling/classact/blob/main/docs/GUIDE.md">docs/GUIDE.md</a>.</p>
+    </article>
+  </main>
+  <footer>
+    <a class="doc-link" href="/">Studio</a>
+    · ClassAct docs · NVIDIA Object-Oriented Agents
+  </footer>
+</body>
+</html>

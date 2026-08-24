@@ -59,12 +59,23 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="ClassAct", version=VERSION, lifespan=lifespan)
+app = FastAPI(
+    title="ClassAct",
+    version=VERSION,
+    lifespan=lifespan,
+    docs_url="/api/openapi",
+    redoc_url=None,
+)
 
 
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/docs")
+def user_docs() -> FileResponse:
+    return FileResponse(STATIC / "docs.html")
 
 
 @app.get("/api/health")

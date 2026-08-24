@@ -8,6 +8,8 @@
 
 Inspect a Python class. Run a method. Watch the call tree. Build a new agent.
 
+**Docs:** in the studio at [`/docs`](http://127.0.0.1:7877/docs) · markdown: [`docs/GUIDE.md`](docs/GUIDE.md)
+
 The model is **open**: [Nemotron 3.5 Lightning](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b) on hosted **NVIDIA NIM**. No local GPU is required.
 
 | | |
