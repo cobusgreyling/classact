@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ast
 import inspect
+import textwrap
 from typing import Any, get_args, get_origin, get_type_hints
 
 from src.catalog import AgentRecord
@@ -168,8 +170,35 @@ def _methods(cls: type) -> list[dict[str, Any]]:
                     "signature": f"{name}({', '.join(a['name'] + ': ' + a['type'] for a in args)}) -> {returns}",
                     "args": args,
                     "returns": returns,
+                    "body": None if agentic else _python_body(orig),
                     "async": inspect.iscoroutinefunction(orig)
                     or inspect.iscoroutinefunction(fn),
                 }
             )
     return methods
+
+
+def _python_body(fn: Any) -> str | None:
+    try:
+        src = textwrap.dedent(inspect.getsource(fn))
+    except Exception:
+        return None
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return None
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        body = list(node.body)
+        if (
+            body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            body = body[1:]
+        if not body:
+            return ""
+        return "\n".join(ast.unparse(stmt) for stmt in body)
+    return None

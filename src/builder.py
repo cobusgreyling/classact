@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import textwrap
 from pathlib import Path
 
 from src.schemas import BuildSpec, FieldSpec, MethodSpec
@@ -13,6 +14,17 @@ STRATEGY_IMPORT = {
 }
 
 _DEFAULTS = {"str": '""', "int": "0", "float": "0.0", "bool": "False"}
+_MAX_BODY_LINES = 24
+_FORBIDDEN = (
+    "exec(",
+    "eval(",
+    "compile(",
+    "__import__",
+    "subprocess",
+    "os.system",
+    "os.popen",
+    "pathlib.Path.home",
+)
 
 
 def generate_source(spec: BuildSpec) -> str:
@@ -69,11 +81,11 @@ def _method_block(method: MethodSpec) -> str:
     args = ", ".join(["self"] + [f"{a.name}: {a.type}" for a in method.args])
     doc = _triple(method.doc.strip() or f"Run {method.name}.")
     if method.kind == "python":
-        ret = _DEFAULTS.get(method.returns, "None")
+        body = _python_body(method)
         return (
             f"    def {method.name}({args}) -> {method.returns}:\n"
             f'        """{doc}"""\n'
-            f"        return {ret}"
+            f"{body}"
         )
     strat = STRATEGY_IMPORT[method.strategy]
     return (
@@ -82,6 +94,31 @@ def _method_block(method: MethodSpec) -> str:
         f'        """{doc}"""\n'
         f"        ..."
     )
+
+
+def _python_body(method: MethodSpec) -> str:
+    cleaned = _validate_python_body(method.body or "")
+    if not cleaned:
+        cleaned = f"return {_DEFAULTS.get(method.returns, 'None')}"
+    return textwrap.indent(cleaned, "        ")
+
+
+def _validate_python_body(body: str) -> str:
+    cleaned = textwrap.dedent(body.replace("\t", "    ")).strip("\n")
+    if not cleaned.strip():
+        return ""
+    lines = cleaned.splitlines()
+    if len(lines) > _MAX_BODY_LINES:
+        raise ValueError(f"Python tool body is limited to {_MAX_BODY_LINES} lines")
+    lowered = cleaned.lower()
+    for token in _FORBIDDEN:
+        if token.lower() in lowered:
+            raise ValueError(f"Python tool body cannot include {token}")
+    try:
+        ast.parse("def _tool():\n" + textwrap.indent(cleaned, "    "))
+    except SyntaxError as exc:
+        raise ValueError(f"invalid Python tool body: {exc.msg}") from exc
+    return cleaned.strip("\n")
 
 
 def _triple(text: str) -> str:

@@ -131,7 +131,7 @@ A live object graph. The **class in the center is a label**, not an editor.
 | **Templates** | Headline, Classifier, Support, Blank. |
 | **Method nodes** | Orbit the class. The selected node is high-contrast green; others dim. Click to inspect; drag to rearrange. |
 | **`+`** | Add a capability. |
-| **Inspector** | Kind (Agentic `…` vs Python tool), strategy (Predict vs CodeAct), args, docstring. |
+| **Inspector** | Kind (Agentic `…` vs Python tool), strategy (Predict vs CodeAct), args, docstring. Python tools get a **body editor** (deterministic code, ~24 lines). Agentic methods stay `…`. |
 | **Live Python** | Updates as you type. |
 | **Generate class** | Writes `workspace/<name>.py`. The agent appears under Inspect. |
 

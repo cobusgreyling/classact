@@ -38,6 +38,7 @@ class MethodSpec(BaseModel):
     returns: Literal["str", "int", "float", "bool"] = "str"
     kind: Literal["agentic", "python"] = "agentic"
     strategy: Literal["Predict", "CodeAct"] = "Predict"
+    body: str = ""
 
     @field_validator("name")
     @classmethod

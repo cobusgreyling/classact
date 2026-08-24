@@ -540,6 +540,14 @@ code { font-family: var(--mono); color: var(--ink); }
 .pick small { display: block; color: var(--muted); font-size: 0.72rem; margin-top: 0.15rem; letter-spacing: 0; text-transform: none; }
 .pick.on { border-color: var(--green); color: var(--green); }
 .arg-row { display: grid; grid-template-columns: 1fr 90px auto; gap: 0.35rem; margin-bottom: 0.35rem; align-items: center; }
+.code-edit {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--green-2);
+  min-height: 8.5rem;
+  width: 100%;
+}
 .inspector-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 1rem; }
 
 /* Watch board */

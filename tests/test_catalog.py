@@ -24,3 +24,6 @@ def test_inspect_marks_ellipsis_vs_python():
     assert kinds["is_refund_eligible"] == "python"
     assert kinds["triage"] == "agentic"
     assert any(m["name"] == "triage" and m["strategy"] for m in info["methods"])
+    get_order = next(m for m in info["methods"] if m["name"] == "get_order")
+    assert get_order["body"]
+    assert "return" in get_order["body"]

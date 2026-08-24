@@ -54,3 +54,41 @@ def test_python_tool_and_fields():
     assert "return 0" in source
     assert "CodeActStrategy" in source
     assert "async def advise" in source
+
+
+def test_python_custom_body():
+    spec = BuildSpec(
+        class_name="LookupAgent",
+        methods=[
+            MethodSpec(
+                name="ping",
+                doc="Return ok.",
+                args=[],
+                returns="str",
+                kind="python",
+                body='return "ok"',
+            )
+        ],
+    )
+    source = generate_source(spec)
+    assert 'return "ok"' in source
+    assert "..." not in source.split("def ping")[-1].split("class")[0]
+
+
+def test_python_body_rejects_exec():
+    spec = BuildSpec(
+        class_name="BadAgent",
+        methods=[
+            MethodSpec(
+                name="bad",
+                kind="python",
+                body="exec('x')",
+            )
+        ],
+    )
+    try:
+        generate_source(spec)
+    except ValueError as exc:
+        assert "exec" in str(exc).lower()
+        return
+    raise AssertionError("expected ValueError")

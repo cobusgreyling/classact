@@ -113,7 +113,10 @@ function umlCard(a) {
   ).join("") || `<div class="uml-row muted">no public fields</div>`;
   const methods = a.methods.map((m) => {
     const mark = m.kind === "agentic" ? `<span class="ell">…</span>` : `<span class="muted">def</span>`;
-    return `<div class="uml-row hit" data-run-method="${esc(m.name)}"><span>${mark} ${esc(m.name)}</span><span class="muted">${esc(m.strategy || "python")} · run</span></div>`;
+    const right = m.kind === "python"
+      ? (m.body ? m.body.split("\n")[0] : "python")
+      : `${m.strategy || "agentic"} · run`;
+    return `<div class="uml-row hit" data-run-method="${esc(m.name)}"><span>${mark} ${esc(m.name)}</span><span class="muted">${esc(right)}</span></div>`;
   }).join("");
   const orbs = a.methods.map((m) => {
     const cls = m.kind === "python" ? "chip" : "chip";
@@ -466,9 +469,11 @@ const TEMPLATES = [
       role: "You are a support agent. Call live Python tools on self before you decide.",
       fields: [{ name: "region", type: "str" }],
       methods: [
-        meth("get_order", "Return the live order record, or empty.", [{ name: "order_id", type: "str" }], "str", "python"),
-        meth("is_refund_eligible", "True only if delivered within 30 days.", [{ name: "order_id", type: "str" }], "bool", "python"),
-        meth("triage", "Create a typed support ticket for this message and order.", [{ name: "message", type: "str" }, { name: "order_id", type: "str" }], "str", "agentic", "CodeAct"),
+        meth("get_order", "Return the live order record, or empty.", [{ name: "order_id", type: "str" }], "str", "python", "Predict",
+          'known = {"ORD-1001": "Studio headphones (delivered)", "ORD-2044": "DGX Spark (in transit)", "ORD-3302": "DisplayPort cable (45 days)"}\nreturn known.get(order_id, "")'),
+        meth("is_refund_eligible", "True only if delivered within 30 days.", [{ name: "order_id", type: "str" }], "bool", "python", "Predict",
+          'return order_id == "ORD-1001"'),
+        meth("triage", "Create a typed support ticket. Use self.get_order and self.is_refund_eligible.", [{ name: "message", type: "str" }, { name: "order_id", type: "str" }], "str", "agentic", "CodeAct"),
       ],
     }),
   },
@@ -484,15 +489,22 @@ const TEMPLATES = [
   },
 ];
 
-function meth(name, doc, args, returns, kind, strategy) {
+function defaultToolBody(returns) {
+  const d = { str: '""', int: "0", float: "0.0", bool: "False" };
+  return `return ${d[returns] || "None"}`;
+}
+
+function meth(name, doc, args, returns, kind, strategy, body) {
+  const k = kind || "agentic";
   return {
     id: nid(),
     name,
     doc,
     args: args.map((a) => ({ ...a })),
     returns: returns || "str",
-    kind: kind || "agentic",
+    kind: k,
     strategy: strategy || "Predict",
+    body: k === "python" ? (body || defaultToolBody(returns || "str")) : (body || ""),
     pinned: false,
     x: 0,
     y: 0,
@@ -530,6 +542,7 @@ function loadBuildFromAgent(a) {
       ["str", "int", "float", "bool"].includes(m.returns) ? m.returns : "str",
       m.kind === "python" ? "python" : "agentic",
       m.strategy === "CodeAct" ? "CodeAct" : "Predict",
+      m.body || "",
     )),
   };
   state.selectedNode = state.build.methods[0] ? state.build.methods[0].id : null;
@@ -744,15 +757,40 @@ function renderInspector() {
       </select>
     </label>
     <label>Docstring / prompt <textarea id="insDoc" rows="3">${esc(m.doc)}</textarea></label>
+    <div id="bodyWrap" class="${m.kind === "python" ? "" : "hidden"}">
+      <h4>Body</h4>
+      <p class="muted">Deterministic Python. Agentic methods can call <code>self.${esc(m.name)}()</code>.</p>
+      <textarea id="insBody" class="code-edit" rows="8" spellcheck="false">${esc(m.body || defaultToolBody(m.returns))}</textarea>
+    </div>
     <div class="inspector-actions">
       <button type="button" class="btn ghost tiny" id="dupM">Duplicate</button>
       <button type="button" class="btn ghost tiny" id="delM">Remove</button>
     </div>`;
   $("#insName").addEventListener("input", (e) => { m.name = e.target.value; patchOrb(m); liveSrc(); });
   $("#insDoc").addEventListener("input", (e) => { m.doc = e.target.value; liveSrc(); });
-  $("#insRet").addEventListener("change", (e) => { m.returns = e.target.value; patchOrb(m); liveSrc(); });
+  $("#insRet").addEventListener("change", (e) => {
+    const prev = defaultToolBody(m.returns);
+    m.returns = e.target.value;
+    if (!String(m.body || "").trim() || m.body.trim() === prev.trim()) {
+      m.body = defaultToolBody(m.returns);
+      const ta = $("#insBody");
+      if (ta) ta.value = m.body;
+    }
+    patchOrb(m);
+    liveSrc();
+  });
+  const insBody = $("#insBody");
+  if (insBody) {
+    insBody.addEventListener("input", (e) => { m.body = e.target.value; liveSrc(); });
+  }
   box.querySelectorAll("[data-kind]").forEach((btn) => {
-    btn.addEventListener("click", () => { m.kind = btn.dataset.kind; renderBuild(); });
+    btn.addEventListener("click", () => {
+      m.kind = btn.dataset.kind;
+      if (m.kind === "python" && !String(m.body || "").trim()) {
+        m.body = defaultToolBody(m.returns);
+      }
+      renderBuild();
+    });
   });
   box.querySelectorAll("[data-st]").forEach((btn) => {
     btn.addEventListener("click", () => { m.strategy = btn.dataset.st; renderBuild(); });
@@ -768,7 +806,7 @@ function renderInspector() {
     row.querySelector(".ar").addEventListener("click", () => { m.args.splice(i, 1); renderBuild(); });
   });
   $("#dupM").addEventListener("click", () => {
-    const copy = meth(m.name + "_copy", m.doc, m.args, m.returns, m.kind, m.strategy);
+    const copy = meth(m.name + "_copy", m.doc, m.args, m.returns, m.kind, m.strategy, m.body);
     b.methods.push(copy);
     state.selectedNode = copy.id;
     renderBuild();
@@ -837,11 +875,24 @@ function toSpec(b) {
       returns: m.returns,
       kind: m.kind,
       strategy: m.strategy,
+      body: m.kind === "python" ? (m.body || "") : "",
     })),
   };
 }
 
 const DEFAULTS = { str: '""', int: "0", float: "0.0", bool: "False" };
+
+function indentToolBody(body, returns) {
+  const raw = String(body || "").replaceAll("\t", "    ");
+  const lines = raw.split("\n");
+  const nonempty = lines.filter((l) => l.trim());
+  const min = nonempty.length
+    ? Math.min(...nonempty.map((l) => (l.match(/^ */) || [""])[0].length))
+    : 0;
+  const cleaned = lines.map((l) => (l.trim() ? l.slice(min) : "")).join("\n").trim();
+  const text = cleaned || `return ${DEFAULTS[returns] || "None"}`;
+  return text.split("\n").map((l) => "        " + l).join("\n");
+}
 
 function generateSourceJS(b) {
   try {
@@ -867,7 +918,8 @@ function generateSourceJS(b) {
       if (m.kind === "python") {
         lines.push(`    def ${m.name}(${args}) -> ${m.returns}:`);
         lines.push(`        """${doc}"""`);
-        lines.push(`        return ${DEFAULTS[m.returns] || "None"}`);
+        const body = indentToolBody(m.body, m.returns);
+        body.split("\n").forEach((ln) => lines.push(ln));
       } else {
         const st = m.strategy === "CodeAct" ? "CodeActStrategy" : "PredictStrategy";
         lines.push(`    @strategy(${st}())`);
