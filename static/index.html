@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ClassAct — NVIDIA Object-Oriented Agents</title>
-  <link rel="stylesheet" href="/static/styles.css?v=0.1.9" />
+  <link rel="stylesheet" href="/static/styles.css?v=0.1.10" />
 </head>
 <body>
   <div class="scan" aria-hidden="true"></div>
@@ -48,7 +48,10 @@
               <h1 id="inspectName"></h1>
               <p class="role" id="inspectRole"></p>
             </div>
-            <button id="forkBtn" class="btn ghost" type="button">Open in Build</button>
+            <div class="inspect-actions">
+              <button id="forkBtn" class="btn ghost" type="button">Open in Build</button>
+              <button id="deleteBtn" class="btn ghost danger hidden" type="button">Delete</button>
+            </div>
           </div>
           <div id="inspectDiagram" class="uml-stage"></div>
           <h3>Source</h3>
@@ -144,6 +147,6 @@
     <a class="doc-link" href="/docs">Docs</a>
     · ClassAct · NVIDIA Object-Oriented Agents · Nemotron on NIM · Apache-2.0
   </footer>
-  <script src="/static/app.js?v=0.1.9"></script>
+  <script src="/static/app.js?v=0.1.10"></script>
 </body>
 </html>

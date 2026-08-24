@@ -82,6 +82,7 @@ function renderList() {
       del.title = "Delete workspace agent";
       del.setAttribute("aria-label", `Delete ${a.class_name}`);
       del.textContent = "×";
+      del.style.flex = "0 0 2.4rem";
       del.addEventListener("click", (ev) => deleteAgent(a, ev));
       row.appendChild(del);
     }
@@ -123,6 +124,7 @@ function renderInspect() {
   $("#inspectOrigin").textContent = `${a.origin} / ${a.module}.py`;
   $("#inspectName").textContent = a.class_name;
   $("#inspectRole").textContent = a.role || "";
+  $("#deleteBtn").classList.toggle("hidden", a.origin !== "workspace");
   $("#inspectDiagram").innerHTML = umlCard(a);
   $("#inspectSource").textContent = a.source || "Loading…";
   if (!a.source) {
@@ -167,6 +169,12 @@ $("#forkBtn").addEventListener("click", () => {
   if (!a) return;
   loadBuildFromAgent(a);
   showTab("build");
+});
+
+$("#deleteBtn").addEventListener("click", (ev) => {
+  const a = agentById(state.selectedId);
+  if (!a || a.origin !== "workspace") return;
+  deleteAgent(a, ev);
 });
 
 $("#inspectDiagram").addEventListener("click", (e) => {
