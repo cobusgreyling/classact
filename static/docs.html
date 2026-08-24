@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Docs — ClassAct</title>
-  <link rel="stylesheet" href="/static/styles.css?v=0.1.8" />
+  <link rel="stylesheet" href="/static/styles.css?v=0.1.10" />
 </head>
 <body class="doc-body">
   <div class="scan" aria-hidden="true"></div>
@@ -24,11 +24,14 @@
     <nav class="toc" aria-label="On this page">
       <a href="#tour">Sixty seconds</a>
       <a href="#what">Architecture</a>
+      <a href="#nooa">What NOOA is</a>
+      <a href="#kind">Kind and strategy</a>
       <a href="#start">Quick start</a>
       <a href="#inspect">Inspect</a>
       <a href="#run">Run</a>
       <a href="#watch">Watch</a>
       <a href="#build">Build</a>
+      <a href="#prod">Production</a>
       <a href="#models">Models</a>
       <a href="#keys">Keyboard</a>
       <a href="#safety">Safety</a>
@@ -72,6 +75,32 @@ ClassAct  FastAPI
    └─ LiteLLM ── HTTPS ──► NIM  Lightning</pre>
       <p>ClassAct does not fork NOOA. It reflects classes, runs them with your NIM key, and writes new modules into <code>workspace/</code>.</p>
 
+      <h2 id="nooa">What NOOA is</h2>
+      <p>A <strong>harness</strong>, not a new model. Same ingredients as other agents (LLM, tools, loop, state). The new abstraction is <strong>where they live</strong>: one Python class instead of prompt + tool JSON + graph.</p>
+      <table>
+        <thead><tr><th>Usual stack</th><th>NOOA</th></tr></thead>
+        <tbody>
+          <tr><td>System prompt</td><td>Class / method <strong>docstrings</strong></td></tr>
+          <tr><td>Tool schemas</td><td><strong>Methods</strong> on <code>self</code></td></tr>
+          <tr><td>Workflow graph</td><td>Ordinary <strong>Python</strong></td></tr>
+          <tr><td><code>agent.invoke(text)</code></td><td><code>await agent.triage(message, order_id)</code></td></tr>
+        </tbody>
+      </table>
+      <p>LLM text can still be <strong>wrong or invented</strong>. Python tool returns are deterministic. Catalog orders are demo data, not a live store.</p>
+
+      <h2 id="kind">Kind and strategy</h2>
+      <p>These are <strong>per method</strong>, not for the whole class. A class can mix all three.</p>
+      <table>
+        <thead><tr><th></th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Kind: Python</strong></td><td>You write the body. A tool. No model.</td></tr>
+          <tr><td><strong>Kind: Agentic</strong></td><td>Body is <code>…</code>. The LLM implements it.</td></tr>
+          <tr><td><strong>Strategy: Predict</strong></td><td>Typed answer, no tools (e.g. <code>classify</code>).</td></tr>
+          <tr><td><strong>Strategy: CodeAct</strong></td><td>Model writes Python and can call <code>self.get_order(...)</code> (e.g. <code>triage</code>).</td></tr>
+        </tbody>
+      </table>
+      <p><code>get_order</code> is a <strong>method</strong>. Its <strong>input</strong> is <code>order_id</code>. Strategy is hidden when Kind is Python. Kind and strategy set that method on the generated class, not a separate workflow file.</p>
+
       <h2 id="start">Quick start</h2>
       <pre class="code">cp .env.example .env   # NVIDIA_API_KEY from build.nvidia.com
 ./run.sh
@@ -83,7 +112,7 @@ NIM_MODEL_ID=nvidia/nemotron-3.5-lightning-30b-a3b</pre>
 
       <h2 id="inspect">Inspect</h2>
       <p>The rail lists agents from <code>catalog/</code> (shipped) and <code>workspace/</code> (generated).</p>
-      <p><strong>+ New agent</strong> opens Build on a <strong>blank</strong> <code>MyAgent</code> — no methods. Press <code>+</code> on the graph to add a capability. Workspace agents have <strong>×</strong> on the rail (deletes the file). Catalog agents cannot be deleted here.</p>
+      <p><strong>+ New agent</strong> opens Build on a <strong>blank</strong> <code>MyAgent</code> — no methods. Press <code>+</code> on the graph to add a capability. Workspace agents have <strong>×</strong> on the rail and <strong>Delete</strong> on the agent pane. Catalog agents cannot be deleted here.</p>
       <ul>
         <li><strong>Fields</strong> — public annotated state</li>
         <li><strong>Methods</strong> — <code>…</code> is agentic (LLM); <code>def</code> is ordinary Python</li>
@@ -93,13 +122,15 @@ NIM_MODEL_ID=nvidia/nemotron-3.5-lightning-30b-a3b</pre>
 
       <h2 id="run">Run</h2>
       <p>A prompt console. Submitting does not leave this tab.</p>
+      <p><strong>You pick the method.</strong> The query does not auto-select <code>get_order</code> vs <code>triage</code>. The dropdown is the entry point. CodeAct may call other methods <em>inside</em> that run. There is no chain to draw in the GUI.</p>
+      <p>For “I want to return my headphones”, set Method to <code>triage</code>, not <code>get_order</code>. <code>get_order</code> expects <code>ORD-1001</code>. Changing the dropdown does not re-run the last reply.</p>
       <ol>
-        <li>Pick agent, method, and model. Agentic methods are selected by default.</li>
+        <li>Pick agent, method, and model. Default method is the first agentic one.</li>
         <li>Type into the large box — that is <code>text</code> / <code>message</code> / <code>prompt</code>.</li>
         <li>Extra arguments (<code>order_id</code>, …) sit under the prompt.</li>
         <li>Use a <strong>Try</strong> chip, or press <strong>⌘↵</strong> / <strong>Ctrl+Enter</strong>.</li>
       </ol>
-      <p><strong>Reply</strong> is a readable card; JSON sits underneath. <strong>Live trace</strong> streams spans on the right.</p>
+      <p><strong>Reply</strong> is a readable card; JSON sits underneath. <strong>Live trace</strong> streams spans on the right. Python tools return demo data; Predict / CodeAct text can be invented.</p>
       <table>
         <thead><tr><th>Agent</th><th>Method</th><th>What to type</th></tr></thead>
         <tbody>
@@ -135,7 +166,13 @@ NIM_MODEL_ID=nvidia/nemotron-3.5-lightning-30b-a3b</pre>
         <li><strong>Inspector</strong> — Agentic (<code>…</code>) vs Python tool; Predict vs CodeAct; args; docstring. Python tools have a <strong>body editor</strong>; agentic methods stay <code>…</code>.</li>
         <li><strong>Live Python</strong> updates as you type. <strong>Generate class</strong> writes <code>workspace/</code>.</li>
       </ul>
-      <p><strong>+ New agent</strong> loads Blank. <strong>Open in Build</strong> loads the agent you were inspecting. Class names must be PascalCase.</p>
+      <p><strong>+ New agent</strong> loads Blank. <strong>Open in Build</strong> loads the agent you were inspecting. Class names must be PascalCase. The graph is the class, not a flowchart.</p>
+
+      <h2 id="prod">From studio to production</h2>
+      <p>Test here, then copy the <strong>class</strong> and the <strong>same call</strong>:</p>
+      <pre class="code">agent = SupportAgent(llm=llm)
+ticket = await agent.triage(message, order_id)</pre>
+      <p>Inspect <strong>Source</strong> is the file to take. Add your HTTP, auth, database, and run CodeAct inside OpenShell or a container. Construct a <strong>new</strong> instance per request so state does not leak. ClassAct is not the production server.</p>
 
       <h2 id="models">Models</h2>
       <p>The Run dropdown talks to hosted NIM. Default is Lightning. Nano and Super are also listed. Override with <code>NOOA_MODEL</code> in <code>.env</code>. No local GPU.</p>
@@ -165,6 +202,7 @@ NIM_MODEL_ID=nvidia/nemotron-3.5-lightning-30b-a3b</pre>
           <tr><td><code>/api/health</code></td><td>NIM ping</td></tr>
           <tr><td><code>/api/models</code></td><td>Run dropdown</td></tr>
           <tr><td><code>/api/agents</code></td><td>Inspect payload</td></tr>
+          <tr><td><code>DELETE /api/agents/{id}</code></td><td>Remove a workspace agent</td></tr>
           <tr><td><code>POST /api/runs</code></td><td>Start a method</td></tr>
           <tr><td><code>/api/runs/{id}/events</code></td><td>SSE spans</td></tr>
           <tr><td><code>POST /api/build</code></td><td>Write an agent</td></tr>

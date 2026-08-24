@@ -12,12 +12,14 @@ Inspect a Python class. Run a method. Watch the call tree. Build a new agent.
 
 The model is **open**: [Nemotron 3.5 Lightning](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b) on hosted **NVIDIA NIM**. No local GPU is required.
 
+NOOA is a **harness**, not a new model: one Python class holds prompts (docstrings), tools (methods), and `…` (the LLM). You call `await agent.triage(...)`, not a generic invoke. **You pick the method** in Run — the query does not auto-route. Kind and strategy are **per method**. Test in the studio, then copy the class into your app.
+
 | | |
 |--|--|
-| **Inspect** | UML class card · **+ New agent** (blank Build) · Open in Build |
-| **Run** | Prompt console — type a message, reply stays on the tab |
+| **Inspect** | UML class card · **+ New agent** (blank Build) · workspace **×** / **Delete** |
+| **Run** | Prompt console — you pick agent + method; reply stays on the tab |
 | **Watch** | Live span tree — methods, generations, LLM calls, CodeAct cells |
-| **Build** | Class is a label; selected method is high-contrast; generate `workspace/` |
+| **Build** | Class is a label; Kind / Strategy on each method; generate `workspace/` |
 
 ```text
 Browser  (black / green / white)
@@ -60,14 +62,16 @@ NIM_MODEL_ID=nvidia/nemotron-3.5-lightning-30b-a3b
 
 ## Sample agents
 
-| Agent | Strategy | What it shows |
+Kind and strategy are **per method**, not per class.
+
+| Agent | Methods | What it shows |
 |--|--|--|
-| `ClassifierAgent` | Predict | Structured Pydantic output, no generated code |
-| `SupportAgent` | CodeAct + Python tools | `get_order` / `is_refund_eligible` as live methods, `triage(...)` is `…` |
+| `ClassifierAgent` | `classify` · Agentic · Predict | Typed Pydantic output, no tools |
+| `SupportAgent` | `get_order` / `is_refund_eligible` · Python; `triage` · Agentic · CodeAct | Tools on `self`; CodeAct may call them. Catalog orders are demo data. |
 
-**+ New agent** (Inspect rail) opens Build on a blank `MyAgent`. The class in the center is a label — name and role sit above the graph. Click a method node to select it (high-contrast); `+` adds a capability. **Generate class** writes `workspace/` and the agent appears in Inspect. **Open in Build** loads the agent you were inspecting, not a blank.
+**+ New agent** (Inspect rail) opens Build on a blank `MyAgent`. The class in the center is a label — name and role sit above the graph. Click a method node to select it (high-contrast); Kind / Strategy sit in the inspector. **Generate class** writes `workspace/` and the agent appears in Inspect. **Open in Build** loads the agent you were inspecting, not a blank. Workspace agents delete with **×** on the rail.
 
-Full walkthrough: [`docs/GUIDE.md`](docs/GUIDE.md).
+Full walkthrough: [`docs/GUIDE.md`](docs/GUIDE.md). Production is the generated class plus `await agent.method(...)` — ClassAct is not the server.
 
 ## Safety
 

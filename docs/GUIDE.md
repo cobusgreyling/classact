@@ -45,6 +45,46 @@ ClassAct does not fork NOOA. It reflects classes, runs them with your NIM client
 
 ---
 
+## What NOOA is
+
+NOOA is a **harness**, not a new model. Same ingredients as other agents (LLM, tools, loop, state). The new abstraction is **where they live**: one Python class instead of prompt + tool JSON + graph.
+
+| Usual agent stack | NOOA |
+|--|--|
+| System prompt | Class / method **docstrings** |
+| Tool schemas | **Methods** on `self` |
+| Workflow graph | Ordinary **Python** |
+| `agent.invoke(text)` | `await agent.triage(message, order_id)` |
+| “Always check X” in the prompt | A real method that **must** run |
+
+`…` means “model, implement this method.” Types are the contract. Facts and gates belong in Python so the model cannot skip them.
+
+The LLM’s words can still be **wrong or invented**. Python tool returns are deterministic. Catalog orders (`ORD-1001`, …) are **demo data**, not a live store.
+
+---
+
+## Kind and strategy
+
+These are **per method**, not for the whole class. A class can mix all three.
+
+**Kind** — is this method Python or an LLM?
+
+| Kind | Body | Who runs it |
+|--|--|--|
+| **Python** | Code you write | Ordinary Python. A **tool**. |
+| **Agentic** | `…` | The LLM, using a strategy. |
+
+**Strategy** — how the LLM implements an **agentic** method. Ignored for Python.
+
+| Strategy | What the model does | Tools |
+|--|--|--|
+| **Predict** | Structured completion | No |
+| **CodeAct** | Writes and runs Python | Yes — `self.get_order(...)` |
+
+Example: `get_order` is Python (input is `order_id`). `triage` is Agentic + CodeAct (input is a *message*). `classify` is Agentic + Predict.
+
+---
+
 ## Quick start
 
 ```bash
@@ -74,7 +114,7 @@ The left rail lists agents from `catalog/` (shipped) and `workspace/` (generated
 
 **+ New agent** at the bottom of the rail opens Build on a **blank** `MyAgent` — no methods, only the class label. Press `+` on the graph to add a capability.
 
-Workspace agents (generated) show **×** on the rail. That deletes the Python file. Shipped `catalog/` agents cannot be deleted from the UI.
+Workspace agents (generated) show **×** on the rail, and **Delete** next to **Open in Build** when that agent is selected. That removes the Python file. Shipped `catalog/` agents cannot be deleted from the UI.
 
 The stage is a UML-style class card:
 
@@ -92,11 +132,29 @@ Click a method row (`· run`) to jump to Run with that method selected. **Open i
 
 Run is a prompt console. Submitting does **not** leave this tab.
 
-1. Pick **agent**, **method**, and **model**. Agentic methods are selected by default.
-2. Type into the large box. That is the method’s main text argument (`text`, `message`, `prompt`, …).
-3. Extra arguments (`order_id`, …) sit under the prompt.
-4. Use a **Try** chip, or press **⌘↵** / **Ctrl+Enter**.
-5. **Reply** shows a readable card (summary, sentiment, ticket fields). Raw JSON is underneath. **Live trace** streams spans on the right.
+**You pick the method.** The dropdown is the entry point. The query text does **not** auto-select `get_order` vs `triage`. Whatever is in **Method** is what ClassAct calls:
+
+```python
+agent = SupportAgent(llm=llm)
+result = await agent.triage(message, order_id)   # because you chose triage
+```
+
+If **Method** is `get_order · python`, a sentence in the box is passed as `order_id` — that is the wrong door. Use `triage` for natural language; use `get_order` only with an id like `ORD-1001`.
+
+The agent can still **choose later methods inside that run** if the method you started is **CodeAct**: the model may call `self.get_order` then `self.is_refund_eligible`. Predict does not call tools. There is **no chain to draw** in the GUI — the Build graph is the class (what exists), not the order of execution. Subsequent steps are Python or CodeAct, or `await` in your own app.
+
+1. Pick **agent**, **method**, and **model**. The default method is the first **agentic** one, not a hidden `main`.
+2. Type into the large box. That is the method’s main text argument (`text`, `message`, `prompt`, …). Extra arguments (`order_id`, …) sit under the prompt.
+3. Use a **Try** chip, or press **⌘↵** / **Ctrl+Enter**.
+4. **Reply** shows a readable card. Raw JSON is underneath. **Live trace** streams spans on the right. Changing the method dropdown does not re-run or re-route the last reply.
+
+### What comes back
+
+| Kind | What you get |
+|--|--|
+| **Python** | Whatever the method returns. Catalog `get_order` is a demo dict. |
+| **Predict** | A typed object from the model. Fields can be invented. |
+| **CodeAct** | The model writes Python; it may call `self.*`. The *plan* can still be wrong; the tool return is real. |
 
 ### What to type
 
@@ -142,6 +200,21 @@ A live object graph. The **class in the center is a label**, not an editor.
 **Open in Build** (Inspect) loads the currently viewed class, including its methods.
 
 Class names must be PascalCase. Method and field names must be valid Python identifiers.
+
+The graph is **not** a flowchart. You do not wire `get_order` → `triage`. You **Run** one method; CodeAct or Python may call others.
+
+---
+
+## From studio to production
+
+ClassAct is a **studio**, not the server. Test here, then copy the **class** and the **same call**:
+
+```python
+agent = SupportAgent(llm=llm)
+ticket = await agent.triage(message, order_id)
+```
+
+Inspect **Source** is the file to take. Add your HTTP, auth, database, and run CodeAct inside OpenShell or a container. Each Run in the studio (and each request in production) should construct a **new** instance so state does not leak.
 
 ---
 
