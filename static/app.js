@@ -503,6 +503,21 @@ function defaultBuild() {
   return TEMPLATES[0].spec();
 }
 
+function startNewAgent() {
+  state.build = {
+    class_name: "MyAgent",
+    role: "You are a focused specialist agent.",
+    fields: [],
+    methods: [
+      meth("run", "Do the task faithfully and concisely.", [{ name: "text", type: "str" }], "str", "agentic", "Predict"),
+    ],
+  };
+  state.selectedNode = state.build.methods[0].id;
+  showTab("build");
+}
+
+$("#newAgentBtn").addEventListener("click", startNewAgent);
+
 function loadBuildFromAgent(a) {
   state.build = {
     class_name: a.class_name,

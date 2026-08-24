@@ -131,6 +131,24 @@ main { max-width: 1280px; margin: 0 auto; padding: 1.1rem 1.2rem 4rem; }
 .item:hover, .item.on { border-color: var(--green); }
 .item .cls { display: block; font-weight: 650; }
 .item .meta { display: block; color: var(--muted); font-size: 0.75rem; font-family: var(--mono); }
+.new-agent {
+  width: 100%;
+  margin-top: 0.55rem;
+  background: transparent;
+  border: 1px dashed var(--green);
+  color: var(--green);
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.new-agent:hover {
+  background: rgba(118, 185, 0, 0.12);
+  color: var(--green-2);
+  border-style: solid;
+}
 
 .empty, .hint, .muted, .role { color: var(--muted); }
 .role { max-width: 46rem; white-space: pre-wrap; }
