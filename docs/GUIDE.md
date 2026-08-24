@@ -74,6 +74,8 @@ The left rail lists agents from `catalog/` (shipped) and `workspace/` (generated
 
 **+ New agent** at the bottom of the rail opens Build on a **blank** `MyAgent` — no methods, only the class label. Press `+` on the graph to add a capability.
 
+Workspace agents (generated) show **×** on the rail. That deletes the Python file. Shipped `catalog/` agents cannot be deleted from the UI.
+
 The stage is a UML-style class card:
 
 | Part | Meaning |
@@ -190,6 +192,7 @@ NOOA can execute model-generated Python (CodeAct).
 | `GET` | `/api/health` | NIM ping + agent count |
 | `GET` | `/api/models` | Run dropdown |
 | `GET` | `/api/agents` | Inspect payload |
+| `DELETE` | `/api/agents/{id}` | Remove a workspace agent file |
 | `POST` | `/api/runs` | Start a method call |
 | `GET` | `/api/runs/{id}` | Result + spans |
 | `GET` | `/api/runs/{id}/events` | SSE span stream |

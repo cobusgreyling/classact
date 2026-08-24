@@ -65,6 +65,19 @@ class Catalog:
             raise KeyError(agent_id)
         return rec
 
+    def delete(self, agent_id: str) -> Path:
+        rec = self.get(agent_id)
+        if rec.origin != "workspace":
+            raise PermissionError("catalog agents cannot be deleted")
+        path = rec.path.resolve()
+        root = self.workspace_dir.resolve()
+        if not path.is_relative_to(root):
+            raise PermissionError("refusing to delete outside workspace")
+        path.unlink(missing_ok=True)
+        sys.modules.pop(f"classact_workspace_{path.stem}", None)
+        self.reload()
+        return path
+
 
 def _load_module(path: Path, origin: str) -> ModuleType:
     name = f"classact_{origin}_{path.stem}"

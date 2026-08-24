@@ -66,14 +66,42 @@ function renderList() {
   const box = $("#agentList");
   box.innerHTML = "";
   for (const a of state.agents) {
+    const row = document.createElement("div");
+    row.className = "item-row";
     const b = document.createElement("button");
     b.type = "button";
     b.className = "item" + (a.id === state.selectedId ? " on" : "");
     const nAgentic = a.methods.filter((m) => m.kind === "agentic").length;
     b.innerHTML = `<span class="cls">${esc(a.class_name)}</span><span class="meta">${esc(a.origin)} · ${nAgentic} ··· / ${a.methods.length}</span>`;
     b.addEventListener("click", () => selectAgent(a.id));
-    box.appendChild(b);
+    row.appendChild(b);
+    if (a.origin === "workspace") {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "item-del";
+      del.title = "Delete workspace agent";
+      del.setAttribute("aria-label", `Delete ${a.class_name}`);
+      del.textContent = "×";
+      del.addEventListener("click", (ev) => deleteAgent(a, ev));
+      row.appendChild(del);
+    }
+    box.appendChild(row);
   }
+}
+
+async function deleteAgent(a, ev) {
+  ev.stopPropagation();
+  if (!confirm(`Delete ${a.class_name} from workspace? This removes the Python file.`)) return;
+  const r = await fetch(`/api/agents/${encodeURIComponent(a.id)}`, { method: "DELETE" });
+  const text = await r.text();
+  if (!r.ok) {
+    let detail = text;
+    try { detail = JSON.parse(text).detail || text; } catch { /* raw */ }
+    alert(typeof detail === "string" ? detail : JSON.stringify(detail));
+    return;
+  }
+  if (state.selectedId === a.id) state.selectedId = null;
+  await loadAgents();
 }
 
 function selectAgent(id) {

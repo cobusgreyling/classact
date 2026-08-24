@@ -131,6 +131,18 @@ main { max-width: 1280px; margin: 0 auto; padding: 1.1rem 1.2rem 4rem; }
 .item:hover, .item.on { border-color: var(--green); }
 .item .cls { display: block; font-weight: 650; }
 .item .meta { display: block; color: var(--muted); font-size: 0.75rem; font-family: var(--mono); }
+.item-row { display: flex; gap: 0.25rem; align-items: stretch; }
+.item-row .item { flex: 1; min-width: 0; }
+.item-del {
+  width: 2rem;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.item-del:hover { border-color: var(--danger); color: var(--danger); }
 .new-agent {
   width: 100%;
   margin-top: 0.55rem;

@@ -137,6 +137,19 @@ def get_agent(agent_id: str) -> dict:
     return data
 
 
+@app.delete("/api/agents/{agent_id}")
+def delete_agent(agent_id: str) -> dict:
+    try:
+        rec = catalog.get(agent_id)
+    except KeyError as exc:
+        raise HTTPException(404, f"unknown agent {agent_id}") from exc
+    try:
+        path = catalog.delete(agent_id)
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    return {"ok": True, "id": rec.id, "path": str(path)}
+
+
 @app.get("/api/agents/{agent_id}/source")
 def get_source(agent_id: str) -> dict:
     try:
