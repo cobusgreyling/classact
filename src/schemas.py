@@ -19,11 +19,24 @@ class ArgSpec(BaseModel):
         return v
 
 
+class FieldSpec(BaseModel):
+    name: str
+    type: Literal["str", "int", "float", "bool"] = "str"
+
+    @field_validator("name")
+    @classmethod
+    def _ident(cls, v: str) -> str:
+        if not v.isidentifier() or v.startswith("_"):
+            raise ValueError(f"invalid field name: {v}")
+        return v
+
+
 class MethodSpec(BaseModel):
     name: str
     doc: str = "Do the task faithfully and concisely."
     args: list[ArgSpec] = Field(default_factory=lambda: [ArgSpec(name="text", type="str")])
-    returns: Literal["str"] = "str"
+    returns: Literal["str", "int", "float", "bool"] = "str"
+    kind: Literal["agentic", "python"] = "agentic"
     strategy: Literal["Predict", "CodeAct"] = "Predict"
 
     @field_validator("name")
@@ -37,6 +50,7 @@ class MethodSpec(BaseModel):
 class BuildSpec(BaseModel):
     class_name: str
     role: str = "You are a focused specialist agent."
+    fields: list[FieldSpec] = Field(default_factory=list)
     methods: list[MethodSpec] = Field(default_factory=list)
 
     @field_validator("class_name")

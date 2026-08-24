@@ -7,11 +7,18 @@ const state = {
   selectedId: null,
   lastRunId: null,
   health: null,
+  build: null,
+  selectedNode: "class",
 };
+
+function nid() {
+  return "n_" + Math.random().toString(36).slice(2, 9);
+}
 
 function showTab(name) {
   $$(".tab").forEach((t) => t.classList.toggle("on", t.dataset.tab === name));
   $$(".pane").forEach((p) => p.classList.toggle("on", p.id === `tab-${name}`));
+  if (name === "build") requestAnimationFrame(() => renderBuild({ relayout: true }));
 }
 
 $$(".tab").forEach((btn) => {
@@ -61,7 +68,8 @@ function renderList() {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "item" + (a.id === state.selectedId ? " on" : "");
-    b.innerHTML = `<span class="cls">${esc(a.class_name)}</span><span class="meta">${esc(a.origin)} · ${a.methods.length} methods</span>`;
+    const nAgentic = a.methods.filter((m) => m.kind === "agentic").length;
+    b.innerHTML = `<span class="cls">${esc(a.class_name)}</span><span class="meta">${esc(a.origin)} · ${nAgentic} ··· / ${a.methods.length}</span>`;
     b.addEventListener("click", () => selectAgent(a.id));
     box.appendChild(b);
   }
@@ -86,37 +94,7 @@ function renderInspect() {
   $("#inspectOrigin").textContent = `${a.origin} / ${a.module}.py`;
   $("#inspectName").textContent = a.class_name;
   $("#inspectRole").textContent = a.role || "";
-  const fields = $("#inspectFields");
-  fields.innerHTML = "";
-  if (!a.fields.length) {
-    fields.innerHTML = `<span class="muted">No public annotated fields.</span>`;
-  } else {
-    for (const f of a.fields) {
-      const c = document.createElement("span");
-      c.className = "chip";
-      c.innerHTML = `<b>${esc(f.name)}</b>: ${esc(f.type)}`;
-      fields.appendChild(c);
-    }
-  }
-  const methods = $("#inspectMethods");
-  methods.innerHTML = "";
-  for (const m of a.methods) {
-    const el = document.createElement("div");
-    el.className = "method";
-    const tag = m.kind === "agentic"
-      ? `<span class="tag">${esc(m.strategy || "…")}</span>`
-      : `<span class="tag py">python</span>`;
-    el.innerHTML = `
-      <div class="head"><span class="name">${esc(m.name)}</span>${tag}</div>
-      <p class="sig">${esc(m.signature)}</p>
-      <p class="doc">${esc(m.doc || "")}</p>
-      <button class="use" type="button" data-method="${esc(m.name)}">Run this method</button>`;
-    el.querySelector(".use").addEventListener("click", () => {
-      fillRunSelectors(a.id, m.name);
-      showTab("run");
-    });
-    methods.appendChild(el);
-  }
+  $("#inspectDiagram").innerHTML = umlCard(a);
   $("#inspectSource").textContent = a.source || "Loading…";
   if (!a.source) {
     jget(`/api/agents/${encodeURIComponent(a.id)}`).then((full) => {
@@ -127,6 +105,37 @@ function renderInspect() {
     });
   }
 }
+
+function umlCard(a) {
+  const fields = (a.fields || []).map((f) =>
+    `<div class="uml-row"><span>${esc(f.name)}</span><span class="muted">${esc(f.type)}</span></div>`
+  ).join("") || `<div class="uml-row muted">no public fields</div>`;
+  const methods = a.methods.map((m) => {
+    const mark = m.kind === "agentic" ? `<span class="ell">…</span>` : `<span class="muted">def</span>`;
+    return `<div class="uml-row"><span>${mark} ${esc(m.name)}</span><span class="muted">${esc(m.strategy || "python")}</span></div>`;
+  }).join("");
+  const orbs = a.methods.map((m) => {
+    const cls = m.kind === "python" ? "chip" : "chip";
+    return `<span class="${cls}"><b>${esc(m.kind === "agentic" ? "…" : "def")}</b> ${esc(m.name)}</span>`;
+  }).join("");
+  return `<article class="uml-card">
+    <header>
+      <span class="kicker">class</span>
+      <strong>${esc(a.class_name)}</strong>
+      <em>(Agent)</em>
+    </header>
+    <div class="uml-sec">${fields}</div>
+    <div class="uml-sec">${methods}</div>
+    <div class="uml-orbit">${orbs}</div>
+  </article>`;
+}
+
+$("#forkBtn").addEventListener("click", () => {
+  const a = agentById(state.selectedId);
+  if (!a) return;
+  loadBuildFromAgent(a);
+  showTab("build");
+});
 
 function fillRunSelectors(agentId, methodName) {
   const agentSel = $("#runAgent");
@@ -159,9 +168,7 @@ function renderRunArgs() {
   const m = currentMethod();
   const box = $("#runArgs");
   box.innerHTML = "";
-  $("#runHint").textContent = m
-    ? (m.doc || m.signature)
-    : "Choose an agent and method.";
+  $("#runHint").textContent = m ? (m.doc || m.signature) : "Choose an agent and method.";
   if (!m) return;
   for (const arg of m.args) {
     const lab = document.createElement("label");
@@ -173,7 +180,7 @@ function renderRunArgs() {
     box.appendChild(lab);
     if (arg.default) {
       const el = lab.querySelector("input, textarea");
-      const raw = arg.default.replace(/^['"]|['"]$/g, "");
+      const raw = String(arg.default).replace(/^['"]|['"]$/g, "");
       if (arg.name === "order_id") el.value = "ORD-1001";
       else if (!isLong) el.value = raw;
     }
@@ -272,10 +279,10 @@ function renderTree(spans) {
     if (s.parent_id && byId[s.parent_id]) byId[s.parent_id].children.push(node);
     else roots.push(node);
   }
-  box.innerHTML = roots.map(renderNode).join("");
+  box.innerHTML = roots.map((n) => renderNode(n, 0)).join("");
 }
 
-function renderNode(node) {
+function renderNode(node, depth) {
   const ms = node.start && node.end ? ((node.end - node.start) / 1e6).toFixed(1) + " ms" : "";
   const bits = [];
   const attrs = node.attrs || {};
@@ -286,99 +293,486 @@ function renderNode(node) {
   if (completion != null) bits.push(`out ${completion}`);
   const snippet = attrs["output.value"] || attrs.code || "";
   const stClass = node.status === "ERROR" ? "bad" : "st";
-  return `<div class="node">
-    <div class="node-h">
+  return `<div class="tbox${depth ? " child" : ""}">
+    <div class="th">
       <span class="nm">${esc(node.name)}</span>
       <span class="${stClass}">${esc(node.status || "")}</span>
       <span class="muted">${esc(ms)} ${esc(bits.join(" · "))}</span>
     </div>
-    ${snippet ? `<div class="dt">${esc(String(snippet).slice(0, 1200))}</div>` : ""}
-    ${node.children.map(renderNode).join("")}
+    ${snippet ? `<div class="td">${esc(String(snippet).slice(0, 900))}</div>` : ""}
+    ${node.children.map((c) => renderNode(c, depth + 1)).join("")}
   </div>`;
 }
 
-function defaultMethodCard() {
+/* ───────── Build ───────── */
+
+const TEMPLATES = [
+  {
+    id: "headline",
+    label: "Headline",
+    spec: () => ({
+      class_name: "HeadlineAgent",
+      role: "You write short, faithful headlines for product updates.",
+      fields: [],
+      methods: [
+        meth("write_headline", "Write a single headline. No extra commentary.", [{ name: "text", type: "str" }], "str", "agentic", "Predict"),
+      ],
+    }),
+  },
+  {
+    id: "classifier",
+    label: "Classifier",
+    spec: () => ({
+      class_name: "FeedbackAgent",
+      role: "You classify customer feedback faithfully. Do not invent facts.",
+      fields: [],
+      methods: [
+        meth("classify", "Classify sentiment and urgency in one pass.", [{ name: "text", type: "str" }], "str", "agentic", "Predict"),
+      ],
+    }),
+  },
+  {
+    id: "support",
+    label: "Support",
+    spec: () => ({
+      class_name: "SupportDesk",
+      role: "You are a support agent. Call live Python tools on self before you decide.",
+      fields: [{ name: "region", type: "str" }],
+      methods: [
+        meth("get_order", "Return the live order record, or empty.", [{ name: "order_id", type: "str" }], "str", "python"),
+        meth("is_refund_eligible", "True only if delivered within 30 days.", [{ name: "order_id", type: "str" }], "bool", "python"),
+        meth("triage", "Create a typed support ticket for this message and order.", [{ name: "message", type: "str" }, { name: "order_id", type: "str" }], "str", "agentic", "CodeAct"),
+      ],
+    }),
+  },
+  {
+    id: "blank",
+    label: "Blank",
+    spec: () => ({
+      class_name: "MyAgent",
+      role: "You are a focused specialist agent.",
+      fields: [],
+      methods: [],
+    }),
+  },
+];
+
+function meth(name, doc, args, returns, kind, strategy) {
   return {
-    name: "write_headline",
-    doc: "Write a single headline. No extra commentary.",
-    arg: "text",
-    strategy: "Predict",
+    id: nid(),
+    name,
+    doc,
+    args: args.map((a) => ({ ...a })),
+    returns: returns || "str",
+    kind: kind || "agentic",
+    strategy: strategy || "Predict",
+    pinned: false,
+    x: 0,
+    y: 0,
   };
 }
 
-function renderBuildMethods(cards) {
-  const box = $("#buildMethods");
-  box.innerHTML = "";
-  cards.forEach((card, idx) => {
-    const el = document.createElement("div");
-    el.className = "mcard";
-    el.innerHTML = `
-      <div class="row2">
-        <label>Method <input class="mn" value="${esc(card.name)}" /></label>
-        <label>Arg <input class="ma" value="${esc(card.arg)}" /></label>
-        <label>Strategy
-          <select class="ms">
-            <option ${card.strategy === "Predict" ? "selected" : ""}>Predict</option>
-            <option ${card.strategy === "CodeAct" ? "selected" : ""}>CodeAct</option>
-          </select>
-        </label>
-        <button class="btn ghost rm" type="button">Remove</button>
-      </div>
-      <label>Docstring / prompt <input class="md" value="${esc(card.doc)}" /></label>`;
-    el.querySelector(".rm").addEventListener("click", () => {
-      cards.splice(idx, 1);
-      renderBuildMethods(cards);
+function defaultBuild() {
+  return TEMPLATES[0].spec();
+}
+
+function loadBuildFromAgent(a) {
+  state.build = {
+    class_name: a.class_name,
+    role: (a.role || "").split("\n")[0],
+    fields: (a.fields || []).map((f) => ({
+      name: f.name,
+      type: ["str", "int", "float", "bool"].includes(f.type) ? f.type : "str",
+    })),
+    methods: a.methods.map((m) => meth(
+      m.name,
+      m.doc || "",
+      (m.args || []).map((arg) => ({
+        name: arg.name,
+        type: ["str", "int", "float", "bool"].includes(arg.type) ? arg.type : "str",
+      })),
+      ["str", "int", "float", "bool"].includes(m.returns) ? m.returns : "str",
+      m.kind === "python" ? "python" : "agentic",
+      m.strategy === "CodeAct" ? "CodeAct" : "Predict",
+    )),
+  };
+  state.selectedNode = "class";
+}
+
+function renderTemplates() {
+  const box = $("#templates");
+  box.innerHTML = TEMPLATES.map((t) =>
+    `<button type="button" data-tpl="${t.id}">${esc(t.label)}</button>`
+  ).join("");
+  box.querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const t = TEMPLATES.find((x) => x.id === btn.dataset.tpl);
+      state.build = t.spec();
+      state.selectedNode = "class";
+      renderBuild({ relayout: true });
     });
-    box.appendChild(el);
   });
-  box._cards = cards;
 }
 
-function readBuildSpec() {
-  const cards = $$("#buildMethods .mcard").map((el) => ({
-    name: el.querySelector(".mn").value.trim(),
-    doc: el.querySelector(".md").value.trim(),
-    args: [{ name: el.querySelector(".ma").value.trim() || "text", type: "str" }],
-    returns: "str",
-    strategy: el.querySelector(".ms").value,
-  }));
+function layoutOrbs(panel, force = false) {
+  const b = state.build;
+  const rect = panel.getBoundingClientRect();
+  const cx = rect.width / 2;
+  const cy = rect.height * 0.48;
+  const slots = b.methods.length + 1;
+  const radius = Math.max(150, Math.min(rect.width, rect.height) * 0.34);
+  b.methods.forEach((m, i) => {
+    if (m.pinned) return;
+    if (!force && (m.x || m.y)) return;
+    const ang = -Math.PI / 2 + (2 * Math.PI * i) / slots;
+    m.x = cx + radius * Math.cos(ang);
+    m.y = cy + radius * Math.sin(ang);
+  });
+  const ang = -Math.PI / 2 + (2 * Math.PI * b.methods.length) / slots;
   return {
-    class_name: $("#buildClass").value.trim(),
-    role: $("#buildRole").value.trim(),
-    methods: cards,
+    cx,
+    cy,
+    addX: cx + radius * Math.cos(ang),
+    addY: cy + radius * Math.sin(ang),
   };
 }
 
-$("#addMethod").addEventListener("click", () => {
-  const cards = $$("#buildMethods .mcard").map((el) => ({
-    name: el.querySelector(".mn").value,
-    doc: el.querySelector(".md").value,
-    arg: el.querySelector(".ma").value,
-    strategy: el.querySelector(".ms").value,
-  }));
-  cards.push({ name: "summarize", doc: "Summarize in one sentence.", arg: "text", strategy: "Predict" });
-  renderBuildMethods(cards);
+function renderBuild(opts = {}) {
+  if (!state.build) state.build = defaultBuild();
+  const b = state.build;
+  const panel = $("#graphPanel");
+  const core = $("#classCore");
+  $("#coreName").textContent = b.class_name || "Agent";
+  $("#coreRole").textContent = b.role || "";
+  $("#coreFields").innerHTML = (b.fields || []).map((f) =>
+    `<span class="chip"><b>${esc(f.name)}</b>: ${esc(f.type)}</span>`
+  ).join("");
+  core.classList.toggle("sel", state.selectedNode === "class");
+
+  const geom = layoutOrbs(panel, Boolean(opts.relayout));
+  const layer = $("#orbLayer");
+  layer.innerHTML = "";
+  b.methods.forEach((m) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    const kindClass = m.kind === "python" ? "py" : (m.strategy === "CodeAct" ? "act" : "");
+    btn.className = `orb ${kindClass}${state.selectedNode === m.id ? " sel" : ""}`;
+    btn.dataset.id = m.id;
+    btn.style.left = `${m.x}px`;
+    btn.style.top = `${m.y}px`;
+    const glyph = m.kind === "python" ? "python" : (m.strategy === "CodeAct" ? "codeact …" : "predict …");
+    const sig = (m.args || []).map((a) => a.name).join(", ");
+    btn.innerHTML = `<span class="glyph">${esc(glyph)}</span><span class="oname">${esc(m.name)}</span><span class="osig">(${esc(sig)}) → ${esc(m.returns)}</span>`;
+    btn.addEventListener("pointerdown", (ev) => startDrag(ev, m, btn));
+    btn.addEventListener("click", (ev) => {
+      if (btn.dataset.dragged === "1") return;
+      ev.stopPropagation();
+      state.selectedNode = m.id;
+      renderBuild();
+    });
+    layer.appendChild(btn);
+  });
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "orb add";
+  add.style.left = `${geom.addX}px`;
+  add.style.top = `${geom.addY}px`;
+  add.textContent = "+";
+  add.title = "Add method";
+  add.addEventListener("click", () => {
+    const n = meth("new_method", "Describe the task.", [{ name: "text", type: "str" }], "str", "agentic", "Predict");
+    b.methods.push(n);
+    state.selectedNode = n.id;
+    renderBuild({ relayout: true });
+  });
+  layer.appendChild(add);
+
+  drawWires(panel, geom, b.methods);
+  renderInspector();
+  $("#buildOut").textContent = generateSourceJS(b);
+}
+
+function drawWires(panel, geom, methods) {
+  const svg = $("#buildWires");
+  const w = panel.clientWidth;
+  const h = panel.clientHeight;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.innerHTML = methods.map((m) => {
+    const cls = m.kind === "python" ? "py" : (m.strategy === "CodeAct" ? "act" : "");
+    const mx = (geom.cx + m.x) / 2;
+    const my = (geom.cy + m.y) / 2 - 24;
+    return `<path class="${cls}" d="M ${geom.cx} ${geom.cy} Q ${mx} ${my} ${m.x} ${m.y}" />`;
+  }).join("");
+}
+
+let drag = null;
+
+function startDrag(ev, method, el) {
+  ev.preventDefault();
+  el.dataset.dragged = "0";
+  el.setPointerCapture(ev.pointerId);
+  const panel = $("#graphPanel").getBoundingClientRect();
+  drag = {
+    id: method.id,
+    dx: ev.clientX - panel.left - method.x,
+    dy: ev.clientY - panel.top - method.y,
+    startX: ev.clientX,
+    startY: ev.clientY,
+    el,
+  };
+}
+
+window.addEventListener("pointermove", (ev) => {
+  if (!drag) return;
+  const panel = $("#graphPanel").getBoundingClientRect();
+  const m = state.build.methods.find((x) => x.id === drag.id);
+  if (!m) return;
+  m.x = clamp(ev.clientX - panel.left - drag.dx, 40, panel.width - 40);
+  m.y = clamp(ev.clientY - panel.top - drag.dy, 40, panel.height - 40);
+  m.pinned = true;
+  drag.el.style.left = `${m.x}px`;
+  drag.el.style.top = `${m.y}px`;
+  if (Math.hypot(ev.clientX - drag.startX, ev.clientY - drag.startY) > 4) {
+    drag.el.dataset.dragged = "1";
+  }
+  const geom = {
+    cx: panel.width / 2,
+    cy: panel.height * 0.48,
+  };
+  drawWires($("#graphPanel"), geom, state.build.methods);
 });
 
-$("#previewBtn").addEventListener("click", async () => {
-  try {
-    const data = await jpost("/api/build/preview", readBuildSpec());
-    $("#buildOut").textContent = data.source;
-  } catch (err) {
-    $("#buildOut").textContent = String(err.message || err);
+window.addEventListener("pointerup", () => { drag = null; });
+
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+$("#classCore").addEventListener("click", () => {
+  state.selectedNode = "class";
+  renderBuild();
+});
+
+window.addEventListener("resize", () => {
+  if ($("#tab-build").classList.contains("on")) {
+    if (state.build) {
+      state.build.methods.forEach((m) => { m.pinned = false; m.x = 0; m.y = 0; });
+    }
+    renderBuild({ relayout: true });
   }
 });
 
-$("#saveBtn").addEventListener("click", async () => {
+function selectedMethod() {
+  if (!state.build || state.selectedNode === "class") return null;
+  return state.build.methods.find((m) => m.id === state.selectedNode) || null;
+}
+
+function renderInspector() {
+  const box = $("#buildInspector");
+  const b = state.build;
+  const m = selectedMethod();
+  if (!m) {
+    box.innerHTML = `
+      <h3>Class</h3>
+      <label>Name <input id="insClass" value="${esc(b.class_name)}" /></label>
+      <label>Role / docstring <textarea id="insRole" rows="3">${esc(b.role)}</textarea></label>
+      <h4>State fields</h4>
+      <div id="insFields"></div>
+      <div class="inspector-actions">
+        <button type="button" class="btn ghost tiny" id="addField">Add field</button>
+      </div>`;
+    $("#insClass").addEventListener("input", (e) => { b.class_name = e.target.value; syncCore(); liveSrc(); });
+    $("#insRole").addEventListener("input", (e) => { b.role = e.target.value; syncCore(); liveSrc(); });
+    renderFieldEditor();
+    $("#addField").addEventListener("click", () => {
+      b.fields.push({ name: "state", type: "str" });
+      renderBuild();
+    });
+    return;
+  }
+  const argsHtml = (m.args || []).map((a, i) => `
+    <div class="arg-row" data-i="${i}">
+      <input class="an" value="${esc(a.name)}" />
+      <select class="at">
+        ${["str", "int", "float", "bool"].map((t) => `<option ${t === a.type ? "selected" : ""}>${t}</option>`).join("")}
+      </select>
+      <button type="button" class="btn ghost tiny ar">×</button>
+    </div>`).join("");
+  box.innerHTML = `
+    <h3>Method</h3>
+    <label>Name <input id="insName" value="${esc(m.name)}" /></label>
+    <h4>Kind</h4>
+    <div class="picker">
+      <button type="button" class="pick ${m.kind === "agentic" ? "on" : ""}" data-kind="agentic">Agentic <small>body is … · LLM</small></button>
+      <button type="button" class="pick ${m.kind === "python" ? "on" : ""}" data-kind="python">Python <small>deterministic tool</small></button>
+    </div>
+    <div id="stratWrap" class="${m.kind === "python" ? "hidden" : ""}">
+      <h4>Strategy</h4>
+      <div class="picker">
+        <button type="button" class="pick ${m.strategy === "Predict" ? "on" : ""}" data-st="Predict">Predict <small>typed, no code exec</small></button>
+        <button type="button" class="pick ${m.strategy === "CodeAct" ? "on" : ""}" data-st="CodeAct">CodeAct <small>model writes Python</small></button>
+      </div>
+    </div>
+    <h4>Arguments</h4>
+    <div id="insArgs">${argsHtml}</div>
+    <button type="button" class="btn ghost tiny" id="addArg">Add arg</button>
+    <label>Returns
+      <select id="insRet">
+        ${["str", "int", "float", "bool"].map((t) => `<option ${t === m.returns ? "selected" : ""}>${t}</option>`).join("")}
+      </select>
+    </label>
+    <label>Docstring / prompt <textarea id="insDoc" rows="3">${esc(m.doc)}</textarea></label>
+    <div class="inspector-actions">
+      <button type="button" class="btn ghost tiny" id="dupM">Duplicate</button>
+      <button type="button" class="btn ghost tiny" id="delM">Remove</button>
+    </div>`;
+  $("#insName").addEventListener("input", (e) => { m.name = e.target.value; patchOrb(m); liveSrc(); });
+  $("#insDoc").addEventListener("input", (e) => { m.doc = e.target.value; liveSrc(); });
+  $("#insRet").addEventListener("change", (e) => { m.returns = e.target.value; patchOrb(m); liveSrc(); });
+  box.querySelectorAll("[data-kind]").forEach((btn) => {
+    btn.addEventListener("click", () => { m.kind = btn.dataset.kind; renderBuild(); });
+  });
+  box.querySelectorAll("[data-st]").forEach((btn) => {
+    btn.addEventListener("click", () => { m.strategy = btn.dataset.st; renderBuild(); });
+  });
+  $("#addArg").addEventListener("click", () => {
+    m.args.push({ name: "value", type: "str" });
+    renderBuild();
+  });
+  box.querySelectorAll(".arg-row").forEach((row) => {
+    const i = Number(row.dataset.i);
+    row.querySelector(".an").addEventListener("input", (e) => { m.args[i].name = e.target.value; patchOrb(m); liveSrc(); });
+    row.querySelector(".at").addEventListener("change", (e) => { m.args[i].type = e.target.value; patchOrb(m); liveSrc(); });
+    row.querySelector(".ar").addEventListener("click", () => { m.args.splice(i, 1); renderBuild(); });
+  });
+  $("#dupM").addEventListener("click", () => {
+    const copy = meth(m.name + "_copy", m.doc, m.args, m.returns, m.kind, m.strategy);
+    b.methods.push(copy);
+    state.selectedNode = copy.id;
+    renderBuild();
+  });
+  $("#delM").addEventListener("click", () => {
+    b.methods = b.methods.filter((x) => x.id !== m.id);
+    state.selectedNode = "class";
+    renderBuild();
+  });
+}
+
+function renderFieldEditor() {
+  const wrap = $("#insFields");
+  const b = state.build;
+  wrap.innerHTML = (b.fields || []).map((f, i) => `
+    <div class="arg-row" data-i="${i}">
+      <input class="fn" value="${esc(f.name)}" />
+      <select class="ft">
+        ${["str", "int", "float", "bool"].map((t) => `<option ${t === f.type ? "selected" : ""}>${t}</option>`).join("")}
+      </select>
+      <button type="button" class="btn ghost tiny fr">×</button>
+    </div>`).join("") || `<p class="muted">No fields — the object holds no extra state.</p>`;
+  wrap.querySelectorAll(".arg-row").forEach((row) => {
+    const i = Number(row.dataset.i);
+    row.querySelector(".fn").addEventListener("input", (e) => { b.fields[i].name = e.target.value; syncCore(); liveSrc(); });
+    row.querySelector(".ft").addEventListener("change", (e) => { b.fields[i].type = e.target.value; syncCore(); liveSrc(); });
+    row.querySelector(".fr").addEventListener("click", () => { b.fields.splice(i, 1); renderBuild(); });
+  });
+}
+
+function syncCore() {
+  const b = state.build;
+  $("#coreName").textContent = b.class_name || "Agent";
+  $("#coreRole").textContent = b.role || "";
+  $("#coreFields").innerHTML = (b.fields || []).map((f) =>
+    `<span class="chip"><b>${esc(f.name)}</b>: ${esc(f.type)}</span>`
+  ).join("");
+}
+
+function patchOrb(m) {
+  const el = document.querySelector(`.orb[data-id="${m.id}"]`);
+  if (!el) return;
+  const glyph = m.kind === "python" ? "python" : (m.strategy === "CodeAct" ? "codeact …" : "predict …");
+  const sig = (m.args || []).map((a) => a.name).join(", ");
+  const g = el.querySelector(".glyph");
+  const n = el.querySelector(".oname");
+  const s = el.querySelector(".osig");
+  if (g) g.textContent = glyph;
+  if (n) n.textContent = m.name;
+  if (s) s.textContent = `(${sig}) → ${m.returns}`;
+}
+
+function liveSrc() {
+  $("#buildOut").textContent = generateSourceJS(state.build);
+}
+
+function toSpec(b) {
+  return {
+    class_name: b.class_name.trim(),
+    role: b.role.trim(),
+    fields: (b.fields || []).filter((f) => f.name.trim()).map((f) => ({ name: f.name.trim(), type: f.type })),
+    methods: (b.methods || []).map((m) => ({
+      name: m.name.trim(),
+      doc: m.doc,
+      args: (m.args || []).filter((a) => a.name.trim()).map((a) => ({ name: a.name.trim(), type: a.type })),
+      returns: m.returns,
+      kind: m.kind,
+      strategy: m.strategy,
+    })),
+  };
+}
+
+const DEFAULTS = { str: '""', int: "0", float: "0.0", bool: "False" };
+
+function generateSourceJS(b) {
   try {
-    const data = await jpost("/api/build", readBuildSpec());
+    const spec = toSpec(b);
+    if (!spec.methods.length) return "# add a method to generate a class";
+    const agentic = spec.methods.filter((m) => m.kind === "agentic");
+    const strategies = [...new Set(agentic.map((m) => m.strategy === "CodeAct" ? "CodeActStrategy" : "PredictStrategy"))].sort();
+    const role = (spec.role || "You are a focused specialist agent.").replaceAll('\\', '\\\\').replaceAll('"""', "'''");
+    const lines = [
+      '"""Generated by ClassAct. Agent class for NVIDIA Object-Oriented Agents."""',
+      "",
+      strategies.length ? "from nooa import Agent, strategy" : "from nooa import Agent",
+    ];
+    if (strategies.length) lines.push(`from nooa.strategies import ${strategies.join(", ")}`);
+    lines.push("", "", `class ${spec.class_name}(Agent):`, `    """${role}"""`, "");
+    for (const f of spec.fields) {
+      lines.push(`    ${f.name}: ${f.type} = ${DEFAULTS[f.type]}`);
+    }
+    if (spec.fields.length) lines.push("");
+    for (const m of spec.methods) {
+      const args = ["self", ...m.args.map((a) => `${a.name}: ${a.type}`)].join(", ");
+      const doc = (m.doc || `Run ${m.name}.`).replaceAll('\\', '\\\\').replaceAll('"""', "'''");
+      if (m.kind === "python") {
+        lines.push(`    def ${m.name}(${args}) -> ${m.returns}:`);
+        lines.push(`        """${doc}"""`);
+        lines.push(`        return ${DEFAULTS[m.returns] || "None"}`);
+      } else {
+        const st = m.strategy === "CodeAct" ? "CodeActStrategy" : "PredictStrategy";
+        lines.push(`    @strategy(${st}())`);
+        lines.push(`    async def ${m.name}(${args}) -> ${m.returns}:`);
+        lines.push(`        """${doc}"""`);
+        lines.push("        ...");
+      }
+      lines.push("");
+    }
+    return lines.join("\n").trimEnd() + "\n";
+  } catch (err) {
+    return `# ${err.message || err}`;
+  }
+}
+
+$("#saveBtn").addEventListener("click", async () => {
+  const spec = toSpec(state.build);
+  $("#buildStatus").textContent = "writing…";
+  try {
+    const data = await jpost("/api/build", spec);
     $("#buildOut").textContent = data.source;
+    $("#buildStatus").textContent = "saved to workspace/";
     await loadAgents();
     if (data.agent_id) {
       selectAgent(data.agent_id);
       showTab("inspect");
     }
   } catch (err) {
+    $("#buildStatus").textContent = "error";
     $("#buildOut").textContent = String(err.message || err);
   }
 });
@@ -400,7 +794,8 @@ async function loadAgents() {
 }
 
 async function boot() {
-  renderBuildMethods([defaultMethodCard()]);
+  state.build = defaultBuild();
+  renderTemplates();
   try {
     const health = await jget("/api/health");
     state.health = health;
@@ -410,6 +805,7 @@ async function boot() {
       ? `NIM live · ${health.nim_model} · ${health.agents} agents`
       : `offline inspect · ${nim.error || "no NVIDIA_API_KEY"}`;
     $("#statusLine").classList.toggle("error", !live);
+    $("#liveDot").classList.toggle("on", live);
   } catch (err) {
     $("#statusLine").textContent = String(err.message || err);
     $("#statusLine").classList.add("error");

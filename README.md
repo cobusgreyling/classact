@@ -15,7 +15,7 @@ The model is **open**: [Nemotron 3.5 Lightning](https://build.nvidia.com/nvidia/
 | **Inspect** | Class, role docstring, fields, methods (`…` vs ordinary Python) |
 | **Run** | Await a typed method against Lightning on NIM |
 | **Watch** | Live span tree — methods, generations, LLM calls, CodeAct cells |
-| **Build** | Form → valid `class Foo(Agent)` written to `workspace/` |
+| **Build** | Live class graph: drag methods, toggle Predict / CodeAct / Python tools, generate a class |
 
 ```text
 Browser  (black / green / white)
@@ -63,7 +63,7 @@ NIM_MODEL_ID=nvidia/nemotron-3.5-lightning-30b-a3b
 | `ClassifierAgent` | Predict | Structured Pydantic output, no generated code |
 | `SupportAgent` | CodeAct + Python tools | `get_order` / `is_refund_eligible` as live methods, `triage(...)` is `…` |
 
-Build a third on camera; it lands in `workspace/` and shows up under Inspect immediately.
+Build is a graphic object editor: the class sits in the center, methods orbit as nodes you can click and drag. Templates (Headline, Classifier, Support, Blank) seed the graph. Generate writes `workspace/` and the new class shows up under Inspect. From Inspect, **Open in Build** loads an existing agent onto the canvas.
 
 ## Safety
 

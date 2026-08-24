@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ClassAct — NVIDIA Object-Oriented Agents</title>
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/styles.css?v=0.1.1" />
 </head>
 <body>
   <div class="scan" aria-hidden="true"></div>
@@ -13,6 +13,7 @@
   </header>
 
   <div class="statusbar">
+    <span class="live-dot" id="liveDot" aria-hidden="true"></span>
     <span class="brand">CLASSACT</span>
     <span class="sep">/</span>
     <span id="statusLine">connecting…</span>
@@ -39,13 +40,15 @@
       <div class="stage">
         <div id="inspectEmpty" class="empty">Select an agent to inspect its class, fields, and methods.</div>
         <div id="inspectView" class="hidden">
-          <p class="eyebrow" id="inspectOrigin"></p>
-          <h1 id="inspectName"></h1>
-          <p class="role" id="inspectRole"></p>
-          <h3>Fields</h3>
-          <div id="inspectFields" class="chips"></div>
-          <h3>Methods</h3>
-          <div id="inspectMethods"></div>
+          <div class="inspect-head">
+            <div>
+              <p class="eyebrow" id="inspectOrigin"></p>
+              <h1 id="inspectName"></h1>
+              <p class="role" id="inspectRole"></p>
+            </div>
+            <button id="forkBtn" class="btn ghost" type="button">Open in Build</button>
+          </div>
+          <div id="inspectDiagram" class="uml-stage"></div>
           <h3>Source</h3>
           <pre id="inspectSource" class="code"></pre>
         </div>
@@ -76,29 +79,36 @@
 
     <section id="tab-watch" class="pane">
       <div class="row">
-        <p class="hint" id="watchHint">Spans from the latest run stream here. Parent–child follows the Python call tree, not just the LLM transcript.</p>
+        <p class="hint" id="watchHint">Each box is a span. Edges follow the Python call tree — not just the LLM transcript.</p>
         <span id="watchRun" class="muted"></span>
       </div>
-      <div id="watchTree" class="tree"></div>
+      <div id="watchTree" class="trace-board"></div>
     </section>
 
     <section id="tab-build" class="pane">
-      <p class="hint">Basic build writes a NOOA Agent class to <code>workspace/</code>. Default strategy is Predict (no generated Python). CodeAct is opt-in.</p>
-      <div class="formgrid">
-        <label>Class name
-          <input id="buildClass" type="text" value="HeadlineAgent" autocomplete="off" />
-        </label>
-        <label class="wide">Role / class docstring
-          <input id="buildRole" type="text" value="You write short, faithful headlines for product updates." />
-        </label>
+      <div class="build-bar">
+        <p class="hint">Click the class or a method. Drag methods around the object. <code>+</code> adds a capability.</p>
+        <div class="templates" id="templates"></div>
       </div>
-      <div id="buildMethods"></div>
+      <div class="build-layout">
+        <div class="graph-panel" id="graphPanel">
+          <svg id="buildWires" class="wires" aria-hidden="true"></svg>
+          <button type="button" class="class-core" id="classCore" aria-label="Edit class">
+            <span class="core-kicker">class</span>
+            <span class="core-name" id="coreName">HeadlineAgent</span>
+            <span class="core-ext">(Agent)</span>
+            <span class="core-role" id="coreRole"></span>
+            <span class="core-fields" id="coreFields"></span>
+          </button>
+          <div id="orbLayer" class="orb-layer"></div>
+        </div>
+        <aside class="build-inspector" id="buildInspector"></aside>
+      </div>
       <div class="row">
-        <button id="addMethod" class="btn ghost" type="button">Add method</button>
-        <button id="previewBtn" class="btn ghost" type="button">Preview</button>
         <button id="saveBtn" class="btn" type="button">Generate class</button>
+        <span id="buildStatus" class="muted"></span>
       </div>
-      <h3>Generated Python</h3>
+      <h3>Live Python</h3>
       <pre id="buildOut" class="code">—</pre>
     </section>
   </main>
@@ -106,6 +116,6 @@
   <footer>
     ClassAct · NVIDIA Object-Oriented Agents · Nemotron on NIM · Apache-2.0
   </footer>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=0.1.1"></script>
 </body>
 </html>
