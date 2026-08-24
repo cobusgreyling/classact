@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ClassAct — NVIDIA Object-Oriented Agents</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="scan" aria-hidden="true"></div>
+  <header class="hero">
+    <img src="/static/header.jpg" alt="ClassAct — inspect, run, watch, and build NVIDIA Object-Oriented Agents" class="banner" />
+  </header>
+
+  <div class="statusbar">
+    <span class="brand">CLASSACT</span>
+    <span class="sep">/</span>
+    <span id="statusLine">connecting…</span>
+    <span class="grow"></span>
+    <span class="kbd">I inspect</span>
+    <span class="kbd">R run</span>
+    <span class="kbd">W watch</span>
+    <span class="kbd">B build</span>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab on" data-tab="inspect" type="button">Inspect</button>
+    <button class="tab" data-tab="run" type="button">Run</button>
+    <button class="tab" data-tab="watch" type="button">Watch</button>
+    <button class="tab" data-tab="build" type="button">Build</button>
+  </nav>
+
+  <main>
+    <section id="tab-inspect" class="pane on">
+      <aside class="rail">
+        <h2>Agents</h2>
+        <div id="agentList" class="list"></div>
+      </aside>
+      <div class="stage">
+        <div id="inspectEmpty" class="empty">Select an agent to inspect its class, fields, and methods.</div>
+        <div id="inspectView" class="hidden">
+          <p class="eyebrow" id="inspectOrigin"></p>
+          <h1 id="inspectName"></h1>
+          <p class="role" id="inspectRole"></p>
+          <h3>Fields</h3>
+          <div id="inspectFields" class="chips"></div>
+          <h3>Methods</h3>
+          <div id="inspectMethods"></div>
+          <h3>Source</h3>
+          <pre id="inspectSource" class="code"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-run" class="pane">
+      <div class="formgrid">
+        <label>Agent
+          <select id="runAgent"></select>
+        </label>
+        <label>Method
+          <select id="runMethod"></select>
+        </label>
+        <label>Model
+          <select id="runModel"></select>
+        </label>
+      </div>
+      <p class="hint" id="runHint"></p>
+      <div id="runArgs" class="args"></div>
+      <div class="row">
+        <button id="runBtn" class="btn" type="button">Run on NIM</button>
+        <span id="runStatus" class="muted"></span>
+      </div>
+      <h3>Result</h3>
+      <pre id="runOut" class="code">—</pre>
+    </section>
+
+    <section id="tab-watch" class="pane">
+      <div class="row">
+        <p class="hint" id="watchHint">Spans from the latest run stream here. Parent–child follows the Python call tree, not just the LLM transcript.</p>
+        <span id="watchRun" class="muted"></span>
+      </div>
+      <div id="watchTree" class="tree"></div>
+    </section>
+
+    <section id="tab-build" class="pane">
+      <p class="hint">Basic build writes a NOOA Agent class to <code>workspace/</code>. Default strategy is Predict (no generated Python). CodeAct is opt-in.</p>
+      <div class="formgrid">
+        <label>Class name
+          <input id="buildClass" type="text" value="HeadlineAgent" autocomplete="off" />
+        </label>
+        <label class="wide">Role / class docstring
+          <input id="buildRole" type="text" value="You write short, faithful headlines for product updates." />
+        </label>
+      </div>
+      <div id="buildMethods"></div>
+      <div class="row">
+        <button id="addMethod" class="btn ghost" type="button">Add method</button>
+        <button id="previewBtn" class="btn ghost" type="button">Preview</button>
+        <button id="saveBtn" class="btn" type="button">Generate class</button>
+      </div>
+      <h3>Generated Python</h3>
+      <pre id="buildOut" class="code">—</pre>
+    </section>
+  </main>
+
+  <footer>
+    ClassAct · NVIDIA Object-Oriented Agents · Nemotron on NIM · Apache-2.0
+  </footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>
