@@ -8,7 +8,7 @@ const state = {
   lastRunId: null,
   health: null,
   build: null,
-  selectedNode: "class",
+  selectedNode: null,
 };
 
 function nid() {
@@ -523,7 +523,7 @@ function loadBuildFromAgent(a) {
       m.strategy === "CodeAct" ? "CodeAct" : "Predict",
     )),
   };
-  state.selectedNode = "class";
+  state.selectedNode = state.build.methods[0] ? state.build.methods[0].id : null;
 }
 
 function renderTemplates() {
@@ -535,7 +535,7 @@ function renderTemplates() {
     btn.addEventListener("click", () => {
       const t = TEMPLATES.find((x) => x.id === btn.dataset.tpl);
       state.build = t.spec();
-      state.selectedNode = "class";
+      state.selectedNode = state.build.methods[0] ? state.build.methods[0].id : null;
       renderBuild({ relayout: true });
     });
   });
@@ -574,7 +574,14 @@ function renderBuild(opts = {}) {
   $("#coreFields").innerHTML = (b.fields || []).map((f) =>
     `<span class="chip"><b>${esc(f.name)}</b>: ${esc(f.type)}</span>`
   ).join("");
-  core.classList.toggle("sel", state.selectedNode === "class");
+  core.classList.remove("sel");
+  if (!b.methods.some((m) => m.id === state.selectedNode)) {
+    state.selectedNode = b.methods[0] ? b.methods[0].id : null;
+  }
+  const barClass = $("#barClass");
+  const barRole = $("#barRole");
+  if (barClass && document.activeElement !== barClass) barClass.value = b.class_name || "";
+  if (barRole && document.activeElement !== barRole) barRole.value = b.role || "";
 
   const geom = layoutOrbs(panel, Boolean(opts.relayout));
   const layer = $("#orbLayer");
@@ -628,7 +635,8 @@ function drawWires(panel, geom, methods) {
     const cls = m.kind === "python" ? "py" : (m.strategy === "CodeAct" ? "act" : "");
     const mx = (geom.cx + m.x) / 2;
     const my = (geom.cy + m.y) / 2 - 24;
-    return `<path class="${cls}" d="M ${geom.cx} ${geom.cy} Q ${mx} ${my} ${m.x} ${m.y}" />`;
+    const on = m.id === state.selectedNode ? " on" : "";
+    return `<path class="${cls}${on}" d="M ${geom.cx} ${geom.cy} Q ${mx} ${my} ${m.x} ${m.y}" />`;
   }).join("");
 }
 
@@ -673,11 +681,6 @@ window.addEventListener("pointerup", () => { drag = null; });
 
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
-$("#classCore").addEventListener("click", () => {
-  state.selectedNode = "class";
-  renderBuild();
-});
-
 window.addEventListener("resize", () => {
   if ($("#tab-build").classList.contains("on")) {
     if (state.build) {
@@ -688,7 +691,7 @@ window.addEventListener("resize", () => {
 });
 
 function selectedMethod() {
-  if (!state.build || state.selectedNode === "class") return null;
+  if (!state.build || !state.selectedNode) return null;
   return state.build.methods.find((m) => m.id === state.selectedNode) || null;
 }
 
@@ -697,22 +700,7 @@ function renderInspector() {
   const b = state.build;
   const m = selectedMethod();
   if (!m) {
-    box.innerHTML = `
-      <h3>Class</h3>
-      <label>Name <input id="insClass" value="${esc(b.class_name)}" /></label>
-      <label>Role / docstring <textarea id="insRole" rows="3">${esc(b.role)}</textarea></label>
-      <h4>State fields</h4>
-      <div id="insFields"></div>
-      <div class="inspector-actions">
-        <button type="button" class="btn ghost tiny" id="addField">Add field</button>
-      </div>`;
-    $("#insClass").addEventListener("input", (e) => { b.class_name = e.target.value; syncCore(); liveSrc(); });
-    $("#insRole").addEventListener("input", (e) => { b.role = e.target.value; syncCore(); liveSrc(); });
-    renderFieldEditor();
-    $("#addField").addEventListener("click", () => {
-      b.fields.push({ name: "state", type: "str" });
-      renderBuild();
-    });
+    box.innerHTML = `<h3>Method</h3><p class="muted">Click a method node, or press <strong>+</strong> to add one. The class in the center is only a label — name and role sit above the graph.</p>`;
     return;
   }
   const argsHtml = (m.args || []).map((a, i) => `
@@ -778,7 +766,7 @@ function renderInspector() {
   });
   $("#delM").addEventListener("click", () => {
     b.methods = b.methods.filter((x) => x.id !== m.id);
-    state.selectedNode = "class";
+    state.selectedNode = b.methods[0] ? b.methods[0].id : null;
     renderBuild();
   });
 }
@@ -922,7 +910,20 @@ async function loadAgents() {
 
 async function boot() {
   state.build = defaultBuild();
+  state.selectedNode = state.build.methods[0] ? state.build.methods[0].id : null;
   renderTemplates();
+  $("#barClass").addEventListener("input", (e) => {
+    if (!state.build) return;
+    state.build.class_name = e.target.value;
+    syncCore();
+    liveSrc();
+  });
+  $("#barRole").addEventListener("input", (e) => {
+    if (!state.build) return;
+    state.build.role = e.target.value;
+    syncCore();
+    liveSrc();
+  });
   try {
     const health = await jget("/api/health");
     state.health = health;

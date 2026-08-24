@@ -110,8 +110,8 @@ Use Watch when you care about retries, generated code, and token counts. The sam
 
 Build is a live object graph.
 
-- The **class** sits in the center. Click it to edit name, role, and state fields.
-- **Methods orbit** the class. Click to inspect; drag to rearrange.
+- The **class** in the center is a label. Name and role are the fields above the graph — the class node is not selected or edited.
+- **Methods orbit** the class. The selected method is high-contrast (green on black, others dim). Click to inspect; drag to rearrange.
 - **`+`** adds a capability.
 - Kind: **Agentic (`…`)** vs **Python tool** (deterministic `return`).
 - Strategy (agentic only): **Predict** (typed, no code exec) vs **CodeAct** (model writes Python).
