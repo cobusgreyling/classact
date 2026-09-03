@@ -256,6 +256,7 @@ function renderRunArgs() {
   $("#runHint").textContent = m
     ? `${agent ? agent.class_name + "." : ""}${m.name} — ${m.doc || m.signature}`
     : "Choose an agent and method, then type a message.";
+  renderRunCall();
   if (!m) return;
   const primary = primaryTextArg(m);
   $("#promptLabel").textContent = primary ? primary.name : "input";
@@ -305,6 +306,27 @@ function renderSamples(agent, method, primary) {
 function updatePromptCount() {
   const n = ($("#runPrompt").value || "").length;
   $("#promptCount").textContent = `${n} chars`;
+}
+
+function renderRunCall() {
+  const el = $("#runCall");
+  if (!el) return;
+  const agent = currentAgent();
+  const m = currentMethod();
+  if (!agent || !m) {
+    el.textContent = "";
+    el.classList.remove("warn");
+    return;
+  }
+  const names = (m.args || []).map((a) => a.name);
+  const call = `await ${agent.class_name}.${m.name}(${names.join(", ")})`;
+  el.classList.toggle("warn", m.kind === "python");
+  let html = `Calling <code>${esc(call)}</code> — you pick the method; the prompt does not auto-route.`;
+  if (m.kind === "python") {
+    const arg = names[0] || "the argument";
+    html += ` This is a Python tool — pass a real <code>${esc(arg)}</code>, not a sentence.`;
+  }
+  el.innerHTML = html;
 }
 
 function collectRunArgs(m) {
@@ -1024,13 +1046,15 @@ async function boot() {
   try {
     const health = await jget("/api/health");
     state.health = health;
-    const nim = health.nim || {};
-    const live = health.has_key && nim.ok;
-    $("#statusLine").textContent = live
-      ? `NIM live · ${health.nim_model} · ${health.agents} agents`
-      : `offline inspect · ${nim.error || "no NVIDIA_API_KEY"}`;
-    $("#statusLine").classList.toggle("error", !live);
-    $("#liveDot").classList.toggle("on", live);
+    const hasKey = Boolean(health.has_key);
+    const n = health.agents ?? 0;
+    const model = health.nim_model || "NIM";
+    $("#statusLine").textContent = hasKey
+      ? `NIM key set · ${model} · ${n} agents`
+      : `Inspect & Build live · ${n} agents · set NVIDIA_API_KEY to Run`;
+    $("#statusLine").classList.remove("error");
+    $("#liveDot").classList.toggle("on", hasKey);
+    $("#keyLink")?.classList.toggle("hidden", hasKey);
   } catch (err) {
     $("#statusLine").textContent = String(err.message || err);
     $("#statusLine").classList.add("error");

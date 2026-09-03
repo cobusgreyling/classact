@@ -14,3 +14,7 @@ traces/*
 workspace/*.py
 workspace/__pycache__/
 !workspace/.gitkeep
+classact.egg-info/
+static/classact.mp4
+static/classact.gif
+static/classact.webp

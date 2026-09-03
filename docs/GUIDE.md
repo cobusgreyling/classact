@@ -4,7 +4,7 @@
 
 An agent is a Python class. Methods are capabilities. A method whose body is `…` is filled in at runtime by an LLM.
 
-Open this guide from the studio: **Docs** in the top bar, or [http://127.0.0.1:7877/docs](http://127.0.0.1:7877/docs).
+Open this guide from the studio **Docs** link, or keep reading here.
 
 | | |
 |--|--|
@@ -87,10 +87,12 @@ Example: `get_order` is Python (input is `order_id`). `triage` is Agentic + Code
 
 ## Quick start
 
+Python **3.12 or 3.13** is required (`nooa` does not support 3.11). Inspect and Build work with no key.
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 cp .env.example .env    # set NVIDIA_API_KEY from build.nvidia.com
 ./run.sh
 # → http://127.0.0.1:7877
@@ -209,9 +211,14 @@ The graph is **not** a flowchart. You do not wire `get_order` → `triage`. You 
 
 ClassAct is a **studio**, not the server. Test here, then copy the **class** and the **same call**:
 
+```bash
+python examples/take_home.py --dry-run
+python examples/take_home.py "Great product, but shipping was slow."
+```
+
 ```python
-agent = SupportAgent(llm=llm)
-ticket = await agent.triage(message, order_id)
+agent = ClassifierAgent(llm=llm)
+result = await agent.classify(text)
 ```
 
 Inspect **Source** is the file to take. Add your HTTP, auth, database, and run CodeAct inside OpenShell or a container. Each Run in the studio (and each request in production) should construct a **new** instance so state does not leak.
@@ -262,7 +269,7 @@ NOOA can execute model-generated Python (CodeAct).
 |--|--|--|
 | `GET` | `/` | Studio |
 | `GET` | `/docs` | This guide |
-| `GET` | `/api/health` | NIM ping + agent count |
+| `GET` | `/api/health` | Status (no NIM call). `?ping=1` probes NIM |
 | `GET` | `/api/models` | Run dropdown |
 | `GET` | `/api/agents` | Inspect payload |
 | `DELETE` | `/api/agents/{id}` | Remove a workspace agent file |

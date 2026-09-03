@@ -4,12 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ClassAct — NVIDIA Object-Oriented Agents</title>
-  <link rel="stylesheet" href="/static/styles.css?v=0.1.10" />
+  <meta property="og:title" content="ClassAct — NVIDIA Object-Oriented Agents" />
+  <meta property="og:description" content="Inspect a Python class. Run one method. Watch the call tree. Build a new agent." />
+  <meta property="og:image" content="https://raw.githubusercontent.com/cobusgreyling/classact/main/assets/social.jpg" />
+  <link rel="stylesheet" href="/static/styles.css?v=0.1.11" />
 </head>
 <body>
   <div class="scan" aria-hidden="true"></div>
   <header class="hero">
-    <img src="/static/header.jpg?v=0.1.5" alt="ClassAct — inspect, run, watch, and build NVIDIA Object-Oriented Agents" class="banner" />
+    <video class="banner" autoplay muted loop playsinline poster="/static/header.jpg?v=0.1.11">
+      <source src="/static/classact.mp4?v=0.1.11" type="video/mp4" />
+    </video>
   </header>
 
   <div class="statusbar">
@@ -17,6 +22,7 @@
     <span class="brand">CLASSACT</span>
     <span class="sep">/</span>
     <span id="statusLine">connecting…</span>
+    <a class="doc-link hidden" id="keyLink" href="https://build.nvidia.com" rel="noopener" target="_blank">Get NIM key</a>
     <span class="grow"></span>
     <a class="doc-link" href="/docs">Docs</a>
     <span class="kbd">I inspect</span>
@@ -73,6 +79,7 @@
         </label>
       </div>
       <p class="hint" id="runHint"></p>
+      <p class="call-line" id="runCall"></p>
       <div class="run-layout">
         <div class="run-composer">
           <div class="prompt-shell">

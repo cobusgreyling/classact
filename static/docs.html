@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Docs — ClassAct</title>
-  <link rel="stylesheet" href="/static/styles.css?v=0.1.10" />
+  <link rel="stylesheet" href="/static/styles.css?v=0.1.11" />
 </head>
 <body class="doc-body">
   <div class="scan" aria-hidden="true"></div>
@@ -102,7 +102,10 @@ ClassAct  FastAPI
       <p><code>get_order</code> is a <strong>method</strong>. Its <strong>input</strong> is <code>order_id</code>. Strategy is hidden when Kind is Python. Kind and strategy set that method on the generated class, not a separate workflow file.</p>
 
       <h2 id="start">Quick start</h2>
-      <pre class="code">cp .env.example .env   # NVIDIA_API_KEY from build.nvidia.com
+      <p>Python <strong>3.12 or 3.13</strong> required. Inspect and Build work with no key.</p>
+      <pre class="code">python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env   # NVIDIA_API_KEY from build.nvidia.com
 ./run.sh
 # → http://127.0.0.1:7877
 # → http://127.0.0.1:7877/docs</pre>
@@ -169,9 +172,12 @@ NIM_MODEL_ID=nvidia/nemotron-3.5-lightning-30b-a3b</pre>
       <p><strong>+ New agent</strong> loads Blank. <strong>Open in Build</strong> loads the agent you were inspecting. Class names must be PascalCase. The graph is the class, not a flowchart.</p>
 
       <h2 id="prod">From studio to production</h2>
-      <p>Test here, then copy the <strong>class</strong> and the <strong>same call</strong>:</p>
-      <pre class="code">agent = SupportAgent(llm=llm)
-ticket = await agent.triage(message, order_id)</pre>
+      <p>Test here, then copy the <strong>class</strong> and the <strong>same call</strong>. ClassAct is the studio; NOOA is what you ship:</p>
+      <pre class="code">python examples/take_home.py --dry-run
+python examples/take_home.py "Great product, but shipping was slow."
+
+agent = ClassifierAgent(llm=llm)
+result = await agent.classify(text)</pre>
       <p>Inspect <strong>Source</strong> is the file to take. Add your HTTP, auth, database, and run CodeAct inside OpenShell or a container. Construct a <strong>new</strong> instance per request so state does not leak. ClassAct is not the production server.</p>
 
       <h2 id="models">Models</h2>
@@ -199,7 +205,7 @@ ticket = await agent.triage(message, order_id)</pre>
         <tbody>
           <tr><td><code>/</code></td><td>Studio</td></tr>
           <tr><td><code>/docs</code></td><td>This guide</td></tr>
-          <tr><td><code>/api/health</code></td><td>NIM ping</td></tr>
+          <tr><td><code>/api/health</code></td><td>Status (no NIM call). Add <code>?ping=1</code> to probe NIM</td></tr>
           <tr><td><code>/api/models</code></td><td>Run dropdown</td></tr>
           <tr><td><code>/api/agents</code></td><td>Inspect payload</td></tr>
           <tr><td><code>DELETE /api/agents/{id}</code></td><td>Remove a workspace agent</td></tr>

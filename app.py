@@ -11,7 +11,7 @@ from pathlib import Path
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -37,19 +37,20 @@ catalog = Catalog(ROOT / "catalog", ROOT / "workspace")
 runs = RunManager(hub)
 
 
-def _ensure_header() -> None:
+def _ensure_static() -> None:
     STATIC.mkdir(parents=True, exist_ok=True)
-    src = ASSETS / "header.jpg"
-    dst = STATIC / "header.jpg"
-    if src.exists() and (
-        not dst.exists() or src.stat().st_mtime > dst.stat().st_mtime
-    ):
-        dst.write_bytes(src.read_bytes())
+    for name in ("header.jpg", "classact.mp4", "classact.gif", "classact.webp"):
+        src = ASSETS / name
+        dst = STATIC / name
+        if src.exists() and (
+            not dst.exists() or src.stat().st_mtime > dst.stat().st_mtime
+        ):
+            dst.write_bytes(src.read_bytes())
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    _ensure_header()
+    _ensure_static()
     catalog.reload()
     hub.attach_loop(asyncio.get_running_loop())
     try:
@@ -79,20 +80,30 @@ def user_docs() -> FileResponse:
 
 
 @app.get("/api/health")
-async def health() -> dict:
-    ping = await ping_nim() if nvidia_api_key() else {
-        "ok": False,
-        "error": "NVIDIA_API_KEY is not set",
-    }
+async def health(ping: bool = Query(False)) -> dict:
+    """Studio status. Does not call NIM unless ?ping=1."""
+    has_key = bool(nvidia_api_key())
+    if ping:
+        nim = await ping_nim() if has_key else {
+            "ok": False,
+            "error": "NVIDIA_API_KEY is not set",
+        }
+        nim["pinged"] = has_key
+    else:
+        nim = {
+            "ok": has_key,
+            "pinged": False,
+            "error": None if has_key else "NVIDIA_API_KEY is not set",
+        }
     return {
         "ok": True,
         "name": "ClassAct",
         "version": VERSION,
-        "has_key": bool(nvidia_api_key()),
+        "has_key": has_key,
         "nooa_model": nooa_model(),
         "nim_model": nim_model_id(),
         "agents": len(catalog.list()),
-        "nim": ping,
+        "nim": nim,
     }
 
 
@@ -260,5 +271,5 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
 if __name__ == "__main__":
-    _ensure_header()
+    _ensure_static()
     uvicorn.run("app:app", host=HOST, port=PORT, reload=False)
